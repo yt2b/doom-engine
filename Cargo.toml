@@ -8,5 +8,6 @@ members = ["wad-reader"]
 
 [dependencies]
 anyhow = "1.0.99"
+clap = { version = "4.6.1", features = ["derive"] }
 ggez = "0.9.3"
 wad-reader = { path = "./wad-reader" }
