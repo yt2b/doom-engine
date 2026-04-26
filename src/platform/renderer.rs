@@ -1,0 +1,607 @@
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+
+use crate::core::bsp::get_subsector_indices;
+use crate::core::math::{Line, Vector2};
+use crate::core::player::PLAYER_FOV;
+use crate::core::solidseg::SolidSeg;
+use crate::core::{doom::Doom, player::Player};
+use ggez::graphics::StrokeOptions;
+use ggez::{
+    GameResult, glam,
+    graphics::{Color, DrawMode, FillOptions, MeshBuilder, Rect},
+};
+use wad_reader::map::{Map, Position, Seg, SubSector};
+
+pub const WIDTH: f32 = 1280.0;
+pub const HEIGHT: f32 = 800.0;
+
+pub struct Renderer {
+    map_renderer: MapRenderer,
+    view_renderer: ViewRenderer,
+}
+
+impl Renderer {
+    pub fn new() -> Self {
+        Self {
+            map_renderer: MapRenderer::new(640.0, -280.0, 0.15),
+            view_renderer: ViewRenderer::new(
+                320.0 * 1.5,
+                240.0 * 1.5,
+                Vector2::new(20.0, 40.0),
+                PLAYER_FOV,
+            ),
+        }
+    }
+
+    pub fn draw(&mut self, mb: &mut MeshBuilder, doom: &Doom) -> GameResult<()> {
+        self.map_renderer
+            .render_map(mb, &doom.map, Color::from_rgb(64, 64, 64))?;
+        self.map_renderer
+            .render_player(mb, &doom.player, Color::GREEN)?;
+        self.map_renderer
+            .render_insight_subsector(mb, &doom.player, &doom.map, Color::YELLOW)?;
+        self.view_renderer.render(mb, &doom.map, &doom.player)?;
+        Ok(())
+    }
+}
+
+fn render_line(
+    mb: &mut MeshBuilder,
+    x1: f32,
+    y1: f32,
+    x2: f32,
+    y2: f32,
+    color: Color,
+) -> GameResult<()> {
+    mb.line(&[glam::vec2(x1, y1), glam::vec2(x2, y2)], 1.0, color)?;
+    Ok(())
+}
+
+fn render_circle(
+    mb: &mut MeshBuilder,
+    x: f32,
+    y: f32,
+    radius: f32,
+    color: Color,
+) -> GameResult<()> {
+    mb.circle(
+        DrawMode::Fill(FillOptions::default()),
+        glam::vec2(x, y),
+        radius,
+        0.1,
+        color,
+    )?;
+    Ok(())
+}
+
+struct MapRenderer {
+    offset_x: f32,
+    offset_y: f32,
+    scale: f32,
+}
+
+impl MapRenderer {
+    pub fn new(offset_x: f32, offset_y: f32, scale: f32) -> Self {
+        Self {
+            offset_x,
+            offset_y,
+            scale,
+        }
+    }
+
+    fn to_screen_vertex(&self, x: f32, y: f32) -> (f32, f32) {
+        let x = x * self.scale + self.offset_x;
+        let y = -y * self.scale + self.offset_y;
+        (x, y)
+    }
+
+    fn render_line_pos(
+        &self,
+        mb: &mut MeshBuilder,
+        line: (Position, Position),
+        color: Color,
+    ) -> GameResult<()> {
+        let (s, e) = line;
+        let (x1, y1) = self.to_screen_vertex(s.x as f32, s.y as f32);
+        let (x2, y2) = self.to_screen_vertex(e.x as f32, e.y as f32);
+        render_line(mb, x1, y1, x2, y2, color)?;
+        Ok(())
+    }
+
+    fn render_line_vec2(
+        &self,
+        mb: &mut MeshBuilder,
+        line: (Vector2, Vector2),
+        color: Color,
+    ) -> GameResult<()> {
+        let (s, e) = line;
+        let (x1, y1) = self.to_screen_vertex(s.x, s.y);
+        let (x2, y2) = self.to_screen_vertex(e.x, e.y);
+        render_line(mb, x1, y1, x2, y2, color)?;
+        Ok(())
+    }
+
+    pub fn render_map(&self, mb: &mut MeshBuilder, map: &Map, color: Color) -> GameResult<()> {
+        for l in &map.linedefs {
+            let s = map.vertexes[l.start as usize];
+            let e = map.vertexes[l.end as usize];
+            self.render_line_pos(mb, (s, e), color)?;
+        }
+        for t in &map.things {
+            let (x, y) = self.to_screen_vertex(t.x as f32, t.y as f32);
+            render_circle(mb, x, y, 1.0, color)?;
+        }
+        Ok(())
+    }
+
+    pub fn render_player(
+        &self,
+        mb: &mut MeshBuilder,
+        player: &Player,
+        color: Color,
+    ) -> GameResult<()> {
+        let (px, py) = self.to_screen_vertex(player.pos.x, player.pos.y);
+        render_circle(mb, px, py, 2.0, color)?;
+        let half_fov = player.fov / 2.0;
+        for fov in [half_fov, -half_fov] {
+            let rotated = Vector2::new(800.0, 0.0).rotate(player.angle + fov);
+            let dest = Vector2::new(player.pos.x + rotated.x, player.pos.y + rotated.y);
+            self.render_line_vec2(mb, (player.pos, dest), color)?;
+        }
+        Ok(())
+    }
+
+    fn render_sub_sector(
+        &self,
+        mb: &mut MeshBuilder,
+        idx: usize,
+        map: &Map,
+        player: &Player,
+        color: Color,
+    ) -> GameResult<()> {
+        let sub_sector = &map.subsectors[idx];
+        for i in 0..sub_sector.seg_count {
+            let seg = &map.segs[(sub_sector.seg_idx + i) as usize];
+            let start = Vector2::new(
+                map.vertexes[seg.start as usize].x as f32,
+                map.vertexes[seg.start as usize].y as f32,
+            );
+            let end = Vector2::new(
+                map.vertexes[seg.end as usize].x as f32,
+                map.vertexes[seg.end as usize].y as f32,
+            );
+            let line = Line::new(start, end);
+            if player.is_insight_line(line) {
+                self.render_line_vec2(mb, (start, end), color)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn render_insight_subsector(
+        &self,
+        mb: &mut MeshBuilder,
+        player: &Player,
+        map: &Map,
+        color: Color,
+    ) -> GameResult<()> {
+        let indices = get_subsector_indices(map, player);
+        for idx in indices {
+            self.render_sub_sector(mb, idx, map, player, color)?;
+        }
+        Ok(())
+    }
+}
+
+struct ViewRenderer {
+    width: f32,
+    half_width: f32,
+    height: f32,
+    half_height: f32,
+    screen_dist: f32,
+    offset: Vector2,
+    solid_seg: SolidSeg,
+    upper_clip: Vec<f32>,
+    lower_clip: Vec<f32>,
+    color_map: HashMap<String, Color>,
+}
+
+impl ViewRenderer {
+    pub fn new(width: f32, height: f32, offset: Vector2, fov: f32) -> Self {
+        let half_width = width / 2.0;
+        let screen_dist = half_width / (fov / 2.0).to_radians().tan();
+        Self {
+            width,
+            half_width,
+            height,
+            half_height: height / 2.0,
+            screen_dist,
+            offset,
+            solid_seg: SolidSeg::new(width as i16),
+            upper_clip: vec![-1.0; width as usize],
+            lower_clip: vec![height; width as usize],
+            color_map: HashMap::new(),
+        }
+    }
+
+    fn angle_to_fov_x(&self, angle: f32) -> i16 {
+        (self.half_width - self.screen_dist * (angle.to_radians().tan())) as i16
+    }
+
+    fn fov_x_to_angle(&self, fov_x: i16) -> f32 {
+        // 0からwidth-1までのfov_xをh_fovから-h_fovに変換
+        let x = fov_x as f32 - (self.half_width - 1.0);
+        -(x / self.half_width).atan().to_degrees()
+    }
+
+    pub fn render(&mut self, mb: &mut MeshBuilder, map: &Map, player: &Player) -> GameResult<()> {
+        self.solid_seg.initialize();
+        self.upper_clip.fill(-1.0);
+        self.lower_clip.fill(self.height);
+        // プレイヤーから見えるサブセクターを描画する
+        for idx in get_subsector_indices(map, player) {
+            self.render_subsector(mb, &map.subsectors[idx], map, player)?;
+        }
+        let bounds = Rect::new(self.offset.x, self.offset.y, self.width, self.height);
+        let mode = DrawMode::Stroke(StrokeOptions::default());
+        mb.rectangle(mode, bounds, Color::WHITE)?;
+        Ok(())
+    }
+
+    pub fn render_subsector(
+        &mut self,
+        mb: &mut MeshBuilder,
+        sub_sector: &SubSector,
+        map: &Map,
+        player: &Player,
+    ) -> GameResult<()> {
+        for i in 0..sub_sector.seg_count {
+            let seg = &map.segs[(sub_sector.seg_idx + i) as usize];
+            self.render_seg(mb, seg, map, player)?;
+        }
+        Ok(())
+    }
+
+    pub fn render_seg(
+        &mut self,
+        mb: &mut MeshBuilder,
+        seg: &wad_reader::map::Seg,
+        map: &Map,
+        player: &Player,
+    ) -> GameResult<()> {
+        let start = Vector2::new(
+            map.vertexes[seg.start as usize].x as f32,
+            map.vertexes[seg.start as usize].y as f32,
+        );
+        let end = Vector2::new(
+            map.vertexes[seg.end as usize].x as f32,
+            map.vertexes[seg.end as usize].y as f32,
+        );
+        let line = Line::new(start, end);
+        if let Some((start_angle, end_angle)) = player.to_fov_line_angle(line) {
+            let linedef = &map.linedefs[seg.line as usize];
+            // 後ろがない場合はsolid wallとして描画する
+            if linedef.back == -1 {
+                let fov_x = (
+                    self.angle_to_fov_x(start_angle),
+                    self.angle_to_fov_x(end_angle),
+                );
+                let ranges = self.solid_seg.get_renderable_ranges(fov_x);
+                for range in &ranges {
+                    self.render_solid_wall(mb, map, seg, player, line, *range)?;
+                }
+                for range in ranges {
+                    self.solid_seg.set_renderable_range(range);
+                }
+                return Ok(());
+            }
+            let front_sector = &map.sectors[map.sidedefs[linedef.front as usize].sector as usize];
+            let back_sector = &map.sectors[map.sidedefs[linedef.back as usize].sector as usize];
+            // 前後の部屋の天井または床の高さが違う場合は、portal wallとして描画する
+            if (front_sector.ceiling_height != back_sector.ceiling_height)
+                || (front_sector.floor_height != back_sector.floor_height)
+            {
+                let fov_x = (
+                    self.angle_to_fov_x(start_angle),
+                    self.angle_to_fov_x(end_angle),
+                );
+                for range in self.solid_seg.get_renderable_ranges(fov_x) {
+                    self.render_portal_wall(mb, map, seg, player, line, range)?;
+                }
+                return Ok(());
+            }
+            if back_sector.ceiling_texture_name == front_sector.ceiling_texture_name
+                && back_sector.floor_texture_name == front_sector.floor_texture_name
+                && back_sector.light_level == front_sector.light_level
+                && map.sidedefs[linedef.front as usize].upper_texture_name == "-"
+            {
+                return Ok(());
+            }
+            let fov_x = (
+                self.angle_to_fov_x(start_angle),
+                self.angle_to_fov_x(end_angle),
+            );
+            for range in self.solid_seg.get_renderable_ranges(fov_x) {
+                self.render_portal_wall(mb, map, seg, player, line, range)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn calc_scale(&self, fov_x: i16, normal_angle: f32, dist: f32, player_angle: f32) -> f32 {
+        // 視界上の角度(0度なら正面)
+        let angle_fov = self.fov_x_to_angle(fov_x);
+        // 視線と壁の法線との差
+        let angle_b = (normal_angle - (player_angle + angle_fov)).abs();
+        // 端点との距離(斜めの壁の補正をした後、視線の歪みを補正する)
+        let edge_dist = dist / angle_b.to_radians().cos() * angle_fov.to_radians().cos();
+        // 倍率
+        self.screen_dist / edge_dist
+    }
+
+    fn calc_line_scale(&self, line: Line, player: &Player, fov_x: (i16, i16)) -> (f32, f32) {
+        // 線分の角度 + 90度
+        let normal_angle = line.angle() + 90.0;
+        // 線分の角度 + 90度　- 壁の端点の角度 ※法線の距離を求めるのに使う
+        let offset_angle = (normal_angle - (line.start - player.pos).angle()).abs();
+        // プレイヤーと点の距離
+        let hypotenuse = line.start.dist(&player.pos);
+        // 壁の法線距離 ※「cos(offset_angle) = dits / hypotenuse」の変形
+        let dist = hypotenuse * offset_angle.to_radians().cos();
+        // (視界のx座標、線分の角度 + 90度、壁の垂線の距離、プレイヤーの角度）から倍率を求める
+        let scale1 = self.calc_scale(fov_x.0, normal_angle, dist, player.angle);
+        let scale2 = self.calc_scale(fov_x.1, normal_angle, dist, player.angle);
+        let scale_step = if (fov_x.1 - fov_x.0) > 0 {
+            (scale2 - scale1) / (fov_x.1 - fov_x.0) as f32
+        } else {
+            0.0
+        };
+        (scale1, scale_step)
+    }
+
+    pub fn render_solid_wall(
+        &mut self,
+        mb: &mut MeshBuilder,
+        map: &Map,
+        seg: &Seg,
+        player: &Player,
+        line: Line,
+        fov_x: (i16, i16),
+    ) -> GameResult<()> {
+        let linedef = &map.linedefs[seg.line as usize];
+        let sidedef = &map.sidedefs[linedef.front as usize];
+        let sector = &map.sectors[sidedef.sector as usize];
+        // テクスチャ
+        let ceiling_texture = &sector.ceiling_texture_name;
+        let wall_texture = &sidedef.middle_texture_name;
+        let floor_texture = &sector.floor_texture_name;
+        let light_level = sector.light_level;
+        // プレイヤーの視点からの高さ
+        let ceiling_height = sector.ceiling_height as f32 - player.view_height;
+        let floor_height = sector.floor_height as f32 - player.view_height;
+        // 描画判定
+        let is_render_ceiling = ceiling_height > 0.0;
+        let is_render_wall = sidedef.middle_texture_name != "-";
+        let is_render_floor = floor_height < 0.0;
+
+        let (scale1, scale_step) = self.calc_line_scale(line, player, fov_x);
+        let wall_y1 = (self.height / 2.0) - ceiling_height * scale1;
+        let wall_y1_step = -scale_step * ceiling_height;
+        let wall_y2 = (self.height / 2.0) - floor_height * scale1;
+        let wall_y2_step = -scale_step * floor_height;
+
+        for x in fov_x.0..(fov_x.1 + 1) {
+            let idx_x = x as usize;
+            let diff = (x - fov_x.0) as f32;
+            let y1 = wall_y1 + wall_y1_step * diff;
+            let y2 = wall_y2 + wall_y2_step * diff;
+            if is_render_ceiling {
+                // 天井の上端はクリップの上端、下端は壁全体の上端とクリップの下端の小さい方
+                let c_y1 = self.upper_clip[idx_x] + 1.0;
+                let c_y2 = (y1 - 1.0).min(self.lower_clip[idx_x] - 1.0);
+                self.render_line(mb, x, c_y1, c_y2, ceiling_texture, light_level)?;
+            }
+            if is_render_wall {
+                // 壁の上端は壁全体の上端をクリップ、下端は壁全体の下端をクリップして描画する
+                let w_y1 = y1.max(self.upper_clip[idx_x] + 1.0);
+                let w_y2 = y2.min(self.lower_clip[idx_x] - 1.0);
+                self.render_line(mb, x, w_y1, w_y2, wall_texture, light_level)?;
+            }
+            if is_render_floor {
+                // 床の上端は壁全体の下端とクリップの上端の大きい方、下端はクリップの下端
+                let f_y1 = (y2 + 1.0).max(self.upper_clip[idx_x] + 1.0);
+                let f_y2 = self.lower_clip[idx_x] - 1.0;
+                self.render_line(mb, x, f_y1, f_y2, floor_texture, light_level)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn render_portal_wall(
+        &mut self,
+        mb: &mut MeshBuilder,
+        map: &Map,
+        seg: &Seg,
+        player: &Player,
+        line: Line,
+        fov_x: (i16, i16),
+    ) -> GameResult<()> {
+        let linedef = &map.linedefs[seg.line as usize];
+        let front_sector = &map.sectors[seg.front_sector as usize];
+        let back_sector = &map.sectors[seg.back_sector as usize];
+        let front_sidedef = &map.sidedefs[linedef.front as usize];
+        let light_level = front_sector.light_level;
+        // テクスチャ
+        let upper_wall_texture = &front_sidedef.upper_texture_name;
+        let lower_wall_texture = &front_sidedef.lower_texture_name;
+        let ceiling_texture = &front_sector.ceiling_texture_name;
+        let floor_texture = &front_sector.floor_texture_name;
+        // 高さ
+        let front_ceiling_height = front_sector.ceiling_height as f32 - player.view_height;
+        let front_floor_height = front_sector.floor_height as f32 - player.view_height;
+        let back_ceiling_height = back_sector.ceiling_height as f32 - player.view_height;
+        let back_floor_height = back_sector.floor_height as f32 - player.view_height;
+
+        let ceiling_condition = front_ceiling_height != back_ceiling_height
+            || front_sector.ceiling_texture_name != back_sector.ceiling_texture_name
+            || front_sector.light_level != back_sector.light_level;
+        let is_render_ceiling = ceiling_condition && front_ceiling_height >= 0.0;
+        // 手前の天井が高い場合はupper wallを描画する
+        let is_render_upper_wall = ceiling_condition
+            && upper_wall_texture != "-"
+            && (front_ceiling_height > back_ceiling_height);
+        let floor_condition = front_floor_height != back_floor_height
+            || front_sector.floor_texture_name != back_sector.floor_texture_name
+            || front_sector.light_level != back_sector.light_level;
+        let is_render_floor = floor_condition && front_floor_height < 0.0;
+        // 手前の床が低い場合はlower wallを描画する
+        let is_render_lower_wall = floor_condition
+            && lower_wall_texture != "-"
+            && (front_floor_height < back_floor_height);
+        // 描画するものがない場合は何もしない
+        if !is_render_ceiling && !is_render_upper_wall && !is_render_floor && !is_render_lower_wall
+        {
+            return Ok(());
+        }
+
+        let (scale1, scale_step) = self.calc_line_scale(line, player, fov_x);
+        // 壁全体の上端と下端のy座標と、y座標の変化量
+        let wall_y1 = self.half_height - front_ceiling_height * scale1;
+        let wall_y1_step = -scale_step * front_ceiling_height;
+        let wall_y2 = self.half_height - front_floor_height * scale1;
+        let wall_y2_step = -scale_step * front_floor_height;
+
+        // portalの上端のy座標と、y座標の変化量
+        let (portal_y1, portal_y1_step) =
+            if is_render_upper_wall && back_ceiling_height > front_floor_height {
+                // portalの上端は後ろの天井の高さ
+                (
+                    self.half_height - back_ceiling_height * scale1,
+                    -scale_step * back_ceiling_height,
+                )
+            } else {
+                // portalはないので上端は壁全体の下端
+                (wall_y2, wall_y2_step)
+            };
+        // portalの下端のy座標と、y座標の変化量
+        let (portal_y2, portal_y2_step) =
+            if is_render_lower_wall && back_floor_height < front_ceiling_height {
+                // portalの下端は後ろの床の高さ
+                (
+                    self.half_height - back_floor_height * scale1,
+                    -scale_step * back_floor_height,
+                )
+            } else {
+                // portalはないので下端は壁全体の上端
+                (wall_y1, wall_y1_step)
+            };
+
+        for x in fov_x.0..(fov_x.1 + 1) {
+            let idx_x = x as usize;
+            let diff = (x - fov_x.0) as f32;
+            let wall_y1 = wall_y1 - 1.0 + wall_y1_step * diff;
+            let wall_y2 = wall_y2 + wall_y2_step * diff;
+
+            if is_render_upper_wall {
+                let portal_y1 = portal_y1 + portal_y1_step * diff;
+                // upper_wallの上端は壁全体の上端
+                let upper_wall_y1 = wall_y1 - 1.0;
+                // upper_wallの下端はportalの上端
+                let upper_wall_y2 = portal_y1;
+                if is_render_ceiling {
+                    // 天井の上端はクリップの上端、下端は壁全体の上端とクリップの下端の小さい方
+                    let c_y1 = self.upper_clip[idx_x] + 1.0;
+                    let c_y2 = (wall_y1 - 1.0).min(self.lower_clip[idx_x] - 1.0);
+                    self.render_line(mb, x, c_y1, c_y2, ceiling_texture, light_level)?;
+                }
+                // upper_wallの上端と下端をクリップして描画する
+                let w_y1 = upper_wall_y1.max(self.upper_clip[idx_x] + 1.0);
+                let w_y2 = upper_wall_y2.min(self.lower_clip[idx_x] - 1.0);
+                self.render_line(mb, x, w_y1, w_y2, upper_wall_texture, light_level)?;
+                if self.upper_clip[idx_x] < w_y2 {
+                    self.upper_clip[idx_x] = w_y2
+                }
+            }
+            if is_render_ceiling {
+                // 天井の上端はクリップの上端
+                let c_y1 = self.upper_clip[idx_x] + 1.0;
+                // 天井の下端は壁全体の上端とクリップの下端の小さい方
+                let c_y2 = (wall_y1 - 1.0).min(self.lower_clip[idx_x] - 1.0);
+                self.render_line(mb, x, c_y1, c_y2, ceiling_texture, light_level)?;
+                if self.upper_clip[idx_x] < c_y2 {
+                    self.upper_clip[idx_x] = c_y2
+                }
+            }
+            if is_render_lower_wall {
+                if is_render_floor {
+                    // 床の上端は壁全体の下端とクリップの上端の大きい方、下端はクリップの下端
+                    let f_y1 = (wall_y2 + 1.0).max(self.upper_clip[idx_x] + 1.0);
+                    let f_y2 = self.lower_clip[idx_x] - 1.0;
+                    self.render_line(mb, x, f_y1, f_y2, floor_texture, light_level)?;
+                }
+                let portal_y2 = portal_y2 + portal_y2_step * diff;
+                // lower_wallの上端はportalの下端とクリップの上端の大きい方
+                let w_y1 = (portal_y2 - 1.0).max(self.upper_clip[idx_x] + 1.0);
+                // lower_wallの下端は壁全体の下端とクリップの下端の小さい方
+                let w_y2 = wall_y2.min(self.lower_clip[idx_x] - 1.0);
+                self.render_line(mb, x, w_y1, w_y2, lower_wall_texture, light_level)?;
+                if self.lower_clip[idx_x] > w_y1 {
+                    self.lower_clip[idx_x] = w_y1
+                }
+            }
+            if is_render_floor {
+                // 床の上端は壁全体の下端とクリップの上端の大きい方
+                let f_y1 = (wall_y2 + 1.0).max(self.upper_clip[idx_x] + 1.0);
+                // 床の下端はクリップの下端
+                let f_y2 = self.lower_clip[idx_x] - 1.0;
+                self.render_line(mb, x, f_y1, f_y2, floor_texture, light_level)?;
+                if self.lower_clip[idx_x] > wall_y2 + 1.0 {
+                    self.lower_clip[idx_x] = f_y1
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn render_line(
+        &mut self,
+        mb: &mut MeshBuilder,
+        x: i16,
+        y1: f32,
+        y2: f32,
+        texture: &str,
+        light_level: i16,
+    ) -> GameResult<()> {
+        if y1 > y2 {
+            return Ok(());
+        }
+        let clipped_y1 = y1.clamp(0.0, self.height);
+        let clipped_y2 = (y2 + 1.0).clamp(0.0, self.height);
+        let points = [
+            glam::vec2(self.offset.x + x as f32, self.offset.y + clipped_y1),
+            glam::vec2(self.offset.x + x as f32, self.offset.y + clipped_y2),
+        ];
+        let color = self.get_wall_color(texture, light_level);
+        mb.line(&points, 1.0, color)?;
+        Ok(())
+    }
+
+    fn get_wall_color(&mut self, texture: &str, light_level: i16) -> Color {
+        let key = format!("{texture}{light_level}");
+        if let Some(color) = self.color_map.get(&key) {
+            return *color;
+        }
+        // keyから色を生成する
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        key.hash(&mut hasher);
+        let hash = hasher.finish();
+        let light = light_level as f32 / 255.0;
+        let r = ((hash & 0xFF0000) >> 16) as f32;
+        let g = ((hash & 0x00FF00) >> 8) as f32;
+        let b = (hash & 0x0000FF) as f32;
+        let base_color = Color::from_rgb((r * light) as u8, (g * light) as u8, (b * light) as u8);
+        self.color_map.insert(key, base_color);
+        base_color
+    }
+}

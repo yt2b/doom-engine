@@ -1,0 +1,12 @@
+[package]
+name = "doom-engine"
+version = "0.1.0"
+edition = "2024"
+
+[workspace]
+members = ["wad-reader"]
+
+[dependencies]
+anyhow = "1.0.99"
+ggez = "0.9.3"
+wad-reader = { path = "./wad-reader" }
