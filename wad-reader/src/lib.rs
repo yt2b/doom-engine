@@ -4,11 +4,15 @@ use std::{
     io::{BufReader, Read},
 };
 
+pub mod graphic;
 pub mod map;
 mod read;
 
-use crate::map::Map;
-use crate::read::{read_i32, read_string};
+use crate::{graphic::Graphic, map::Map};
+use crate::{
+    graphic::get_palettes,
+    read::{read_i32, read_string},
+};
 
 pub struct Wad {
     pub ident: String,
@@ -46,6 +50,17 @@ impl Wad {
             .ok_or_else(|| anyhow::anyhow!("Map named '{}' not found", name))?;
         let map_lumps = &self.lumps[start_index..];
         Map::new_from_lumps(map_lumps)
+    }
+
+    pub fn read_graphic(&self) -> Result<Graphic> {
+        // パレットを読み込む
+        let lump = self
+            .lumps
+            .iter()
+            .find(|lump| lump.name == "PLAYPAL")
+            .ok_or_else(|| anyhow::anyhow!("Pallet named 'PLAYPAL' not found"))?;
+        let pallets = get_palettes(&lump.bytes);
+        Ok(Graphic::new(pallets))
     }
 }
 

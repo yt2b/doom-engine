@@ -16,7 +16,7 @@ pub struct Game {
 
 impl Game {
     pub fn start(doom: Doom) -> Result<()> {
-        let game = Self::new(doom);
+        let game = Self::new(doom)?;
         let (ctx, event_loop) = ggez::ContextBuilder::new("doom", "")
             .default_conf(ggez::conf::Conf::new())
             .window_mode(WindowMode::default().dimensions(WIDTH, HEIGHT))
@@ -25,11 +25,12 @@ impl Game {
         event::run(ctx, event_loop, game);
     }
 
-    fn new(doom: Doom) -> Self {
-        Self {
+    fn new(doom: Doom) -> Result<Self> {
+        let graphic = doom.wad.read_graphic()?;
+        Ok(Self {
             doom,
-            renderer: Renderer::new(),
-        }
+            renderer: Renderer::new(graphic),
+        })
     }
 }
 

@@ -5,6 +5,7 @@ use wad_reader::Wad;
 use wad_reader::map::Map;
 
 pub struct Doom {
+    pub wad: Wad,
     pub map: Map,
     pub player: Player,
 }
@@ -14,7 +15,7 @@ impl Doom {
         let map = wad.read_map("E1M1")?;
         let thing = &map.things[0];
         let player = Player::new(thing.x as f32, thing.y as f32, thing.angle as f32);
-        Ok(Self { map, player })
+        Ok(Self { wad, map, player })
     }
 
     pub fn update(&mut self) {

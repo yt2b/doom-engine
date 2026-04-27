@@ -12,19 +12,22 @@ use ggez::{
     glam,
     graphics::{Color, DrawMode, FillOptions, MeshBuilder, Rect},
 };
+use wad_reader::graphic::Graphic;
 use wad_reader::map::{Map, Position, Seg, SubSector};
 
 pub const WIDTH: f32 = 1280.0;
 pub const HEIGHT: f32 = 800.0;
 
 pub struct Renderer {
+    graphic: Graphic,
     map_renderer: MapRenderer,
     view_renderer: ViewRenderer,
 }
 
 impl Renderer {
-    pub fn new() -> Self {
+    pub fn new(graphic: Graphic) -> Self {
         Self {
+            graphic,
             map_renderer: MapRenderer::new(640.0, -280.0, 0.15),
             view_renderer: ViewRenderer::new(
                 320.0 * 1.5,
