@@ -62,15 +62,11 @@ impl Line {
     pub fn new(start: Vector2, end: Vector2) -> Self {
         Self { start, end }
     }
-
-    pub fn angle(&self) -> f32 {
-        (self.end - self.start).angle()
-    }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::core::math::{Line, Vector2};
+    use crate::core::math::Vector2;
 
     fn assert_eq_f32(actual: f32, expected: f32) {
         let epsilon = 0.000001;
@@ -113,30 +109,5 @@ mod tests {
         let v1 = Vector2::new(0.0, 0.0);
         let v2 = Vector2::new(3.0, 4.0);
         assert_eq_f32(v1.dist(&v2), 5.0);
-    }
-
-    #[test]
-    fn test_line_angle() {
-        for (line, expected) in [
-            (
-                Line::new(Vector2::new(10.0, 10.0), Vector2::new(11.0, 10.0)),
-                0.0,
-            ),
-            (
-                Line::new(Vector2::new(10.0, 10.0), Vector2::new(10.0, 11.0)),
-                90.0,
-            ),
-            (
-                Line::new(Vector2::new(10.0, 10.0), Vector2::new(9.0, 10.0)),
-                180.0,
-            ),
-            (
-                Line::new(Vector2::new(10.0, 10.0), Vector2::new(10.0, 9.0)),
-                270.0,
-            ),
-        ] {
-            let actual = line.angle();
-            assert_eq_f32(actual, expected);
-        }
     }
 }
