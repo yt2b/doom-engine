@@ -1,3 +1,4 @@
+use anyhow::Result;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
@@ -8,7 +9,7 @@ use crate::core::solidseg::SolidSeg;
 use crate::core::{doom::Doom, player::Player};
 use ggez::graphics::StrokeOptions;
 use ggez::{
-    GameResult, glam,
+    glam,
     graphics::{Color, DrawMode, FillOptions, MeshBuilder, Rect},
 };
 use wad_reader::map::{Map, Position, Seg, SubSector};
@@ -34,7 +35,7 @@ impl Renderer {
         }
     }
 
-    pub fn draw(&mut self, mb: &mut MeshBuilder, doom: &Doom) -> GameResult<()> {
+    pub fn draw(&mut self, mb: &mut MeshBuilder, doom: &Doom) -> Result<()> {
         self.map_renderer
             .render_map(mb, &doom.map, Color::from_rgb(64, 64, 64))?;
         self.map_renderer
@@ -53,18 +54,12 @@ fn render_line(
     x2: f32,
     y2: f32,
     color: Color,
-) -> GameResult<()> {
+) -> Result<()> {
     mb.line(&[glam::vec2(x1, y1), glam::vec2(x2, y2)], 1.0, color)?;
     Ok(())
 }
 
-fn render_circle(
-    mb: &mut MeshBuilder,
-    x: f32,
-    y: f32,
-    radius: f32,
-    color: Color,
-) -> GameResult<()> {
+fn render_circle(mb: &mut MeshBuilder, x: f32, y: f32, radius: f32, color: Color) -> Result<()> {
     mb.circle(
         DrawMode::Fill(FillOptions::default()),
         glam::vec2(x, y),
@@ -101,7 +96,7 @@ impl MapRenderer {
         mb: &mut MeshBuilder,
         line: (Position, Position),
         color: Color,
-    ) -> GameResult<()> {
+    ) -> Result<()> {
         let (s, e) = line;
         let (x1, y1) = self.to_screen_vertex(s.x as f32, s.y as f32);
         let (x2, y2) = self.to_screen_vertex(e.x as f32, e.y as f32);
@@ -114,7 +109,7 @@ impl MapRenderer {
         mb: &mut MeshBuilder,
         line: (Vector2, Vector2),
         color: Color,
-    ) -> GameResult<()> {
+    ) -> Result<()> {
         let (s, e) = line;
         let (x1, y1) = self.to_screen_vertex(s.x, s.y);
         let (x2, y2) = self.to_screen_vertex(e.x, e.y);
@@ -122,7 +117,7 @@ impl MapRenderer {
         Ok(())
     }
 
-    pub fn render_map(&self, mb: &mut MeshBuilder, map: &Map, color: Color) -> GameResult<()> {
+    pub fn render_map(&self, mb: &mut MeshBuilder, map: &Map, color: Color) -> Result<()> {
         for l in &map.linedefs {
             let s = map.vertexes[l.start as usize];
             let e = map.vertexes[l.end as usize];
@@ -135,12 +130,7 @@ impl MapRenderer {
         Ok(())
     }
 
-    pub fn render_player(
-        &self,
-        mb: &mut MeshBuilder,
-        player: &Player,
-        color: Color,
-    ) -> GameResult<()> {
+    pub fn render_player(&self, mb: &mut MeshBuilder, player: &Player, color: Color) -> Result<()> {
         let (px, py) = self.to_screen_vertex(player.pos.x, player.pos.y);
         render_circle(mb, px, py, 2.0, color)?;
         let half_fov = player.fov / 2.0;
@@ -159,7 +149,7 @@ impl MapRenderer {
         map: &Map,
         player: &Player,
         color: Color,
-    ) -> GameResult<()> {
+    ) -> Result<()> {
         let sub_sector = &map.subsectors[idx];
         for i in 0..sub_sector.seg_count {
             let seg = &map.segs[(sub_sector.seg_idx + i) as usize];
@@ -185,7 +175,7 @@ impl MapRenderer {
         player: &Player,
         map: &Map,
         color: Color,
-    ) -> GameResult<()> {
+    ) -> Result<()> {
         let indices = get_subsector_indices(map, player);
         for idx in indices {
             self.render_sub_sector(mb, idx, map, player, color)?;
@@ -235,7 +225,7 @@ impl ViewRenderer {
         -(x / self.half_width).atan().to_degrees()
     }
 
-    pub fn render(&mut self, mb: &mut MeshBuilder, map: &Map, player: &Player) -> GameResult<()> {
+    pub fn render(&mut self, mb: &mut MeshBuilder, map: &Map, player: &Player) -> Result<()> {
         self.solid_seg.initialize();
         self.upper_clip.fill(-1.0);
         self.lower_clip.fill(self.height);
@@ -255,7 +245,7 @@ impl ViewRenderer {
         sub_sector: &SubSector,
         map: &Map,
         player: &Player,
-    ) -> GameResult<()> {
+    ) -> Result<()> {
         for i in 0..sub_sector.seg_count {
             let seg = &map.segs[(sub_sector.seg_idx + i) as usize];
             self.render_seg(mb, seg, map, player)?;
@@ -269,7 +259,7 @@ impl ViewRenderer {
         seg: &wad_reader::map::Seg,
         map: &Map,
         player: &Player,
-    ) -> GameResult<()> {
+    ) -> Result<()> {
         let start = Vector2::new(
             map.vertexes[seg.start as usize].x as f32,
             map.vertexes[seg.start as usize].y as f32,
@@ -374,7 +364,7 @@ impl ViewRenderer {
         player: &Player,
         line: Line,
         fov_x: (i16, i16),
-    ) -> GameResult<()> {
+    ) -> Result<()> {
         let linedef = &map.linedefs[seg.line as usize];
         let sidedef = &map.sidedefs[linedef.front as usize];
         let sector = &map.sectors[sidedef.sector as usize];
@@ -432,7 +422,7 @@ impl ViewRenderer {
         player: &Player,
         line: Line,
         fov_x: (i16, i16),
-    ) -> GameResult<()> {
+    ) -> Result<()> {
         let linedef = &map.linedefs[seg.line as usize];
         let front_sector = &map.sectors[seg.front_sector as usize];
         let back_sector = &map.sectors[seg.back_sector as usize];
@@ -578,7 +568,7 @@ impl ViewRenderer {
         y2: f32,
         texture: &str,
         light_level: i16,
-    ) -> GameResult<()> {
+    ) -> Result<()> {
         if y1 > y2 {
             return Ok(());
         }
