@@ -52,12 +52,12 @@ impl EventHandler for Game {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
-        let mut canvas = graphics::Canvas::from_frame(ctx, graphics::Color::BLACK);
         let mut mb = graphics::MeshBuilder::new();
         self.renderer
             .draw(&mut mb, &self.doom)
             .map_err(|e| ggez::GameError::CustomError(e.to_string()))?;
         let mesh = Mesh::from_data(ctx, mb.build());
+        let mut canvas = graphics::Canvas::from_frame(ctx, graphics::Color::BLACK);
         canvas.draw(&mesh, graphics::DrawParam::default());
         canvas.finish(ctx)
     }
