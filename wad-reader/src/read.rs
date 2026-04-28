@@ -10,6 +10,14 @@ pub fn read_i16(data: &[u8], offset: usize) -> Result<i16> {
     Ok(i16::from_le_bytes(data[offset..offset + 2].try_into()?))
 }
 
+pub fn read_u16(data: &[u8], offset: usize) -> Result<u16> {
+    Ok(u16::from_le_bytes(data[offset..offset + 2].try_into()?))
+}
+
 pub fn read_i32(data: &[u8], offset: usize) -> Result<i32> {
     Ok(i32::from_le_bytes(data[offset..offset + 4].try_into()?))
+}
+
+pub fn read_u32(data: &[u8], offset: usize) -> Result<u32> {
+    Ok(u32::from_le_bytes(data[offset..offset + 4].try_into()?))
 }

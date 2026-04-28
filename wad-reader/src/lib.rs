@@ -1,5 +1,6 @@
 use anyhow::Result;
 use std::{
+    collections::HashMap,
     fs::File,
     io::{BufReader, Read},
 };
@@ -8,10 +9,13 @@ pub mod graphic;
 pub mod map;
 mod read;
 
-use crate::{graphic::Graphic, map::Map};
 use crate::{
     graphic::get_palettes,
     read::{read_i32, read_string},
+};
+use crate::{
+    graphic::{Graphic, Patch},
+    map::Map,
 };
 
 pub struct Wad {
@@ -42,12 +46,15 @@ impl Wad {
         Ok(Self { ident, lumps })
     }
 
-    pub fn read_map(&self, name: &str) -> Result<Map> {
-        let start_index = self
-            .lumps
+    fn get_lump_index(&self, name: &str) -> Result<usize> {
+        self.lumps
             .iter()
             .position(|lump| lump.name == name)
-            .ok_or_else(|| anyhow::anyhow!("Map named '{}' not found", name))?;
+            .ok_or_else(|| anyhow::anyhow!("Lump named '{}' not found", name))
+    }
+
+    pub fn read_map(&self, name: &str) -> Result<Map> {
+        let start_index = self.get_lump_index(name)?;
         let map_lumps = &self.lumps[start_index..];
         Map::new_from_lumps(map_lumps)
     }
@@ -60,7 +67,14 @@ impl Wad {
             .find(|lump| lump.name == "PLAYPAL")
             .ok_or_else(|| anyhow::anyhow!("Pallet named 'PLAYPAL' not found"))?;
         let pallets = get_palettes(&lump.bytes);
-        Ok(Graphic::new(pallets))
+        // スプライトを読み込む
+        let mut sprites = HashMap::new();
+        let start_idx = self.get_lump_index("S_START")?;
+        let end_idx = self.get_lump_index("S_END")?;
+        for lump in &self.lumps[start_idx + 1..end_idx] {
+            sprites.insert(lump.name.clone(), Patch::new_from_bytes(&lump.bytes)?);
+        }
+        Ok(Graphic::new(pallets, sprites))
     }
 }
 
