@@ -340,9 +340,15 @@ impl ViewRenderer {
         self.screen_dist / edge_dist
     }
 
-    fn calc_line_scale(&self, line: Line, player: &Player, fov_x: (i16, i16)) -> (f32, f32) {
+    fn calc_line_scale(
+        &self,
+        line_angle: f32,
+        line: Line,
+        player: &Player,
+        fov_x: (i16, i16),
+    ) -> (f32, f32) {
         // 線分の角度 + 90度
-        let normal_angle = line.angle() + 90.0;
+        let normal_angle = line_angle + 90.0;
         // 線分の角度 + 90度　- 壁の端点の角度 ※法線の距離を求めるのに使う
         let offset_angle = (normal_angle - (line.start - player.pos).angle()).abs();
         // プレイヤーと点の距離
@@ -385,7 +391,7 @@ impl ViewRenderer {
         let is_render_wall = sidedef.middle_texture_name != "-";
         let is_render_floor = floor_height < 0.0;
 
-        let (scale1, scale_step) = self.calc_line_scale(line, player, fov_x);
+        let (scale1, scale_step) = self.calc_line_scale(seg.angle, line, player, fov_x);
         let wall_y1 = (self.height / 2.0) - ceiling_height * scale1;
         let wall_y1_step = -scale_step * ceiling_height;
         let wall_y2 = (self.height / 2.0) - floor_height * scale1;
@@ -465,7 +471,7 @@ impl ViewRenderer {
             return Ok(());
         }
 
-        let (scale1, scale_step) = self.calc_line_scale(line, player, fov_x);
+        let (scale1, scale_step) = self.calc_line_scale(seg.angle, line, player, fov_x);
         // 壁全体の上端と下端のy座標と、y座標の変化量
         let wall_y1 = self.half_height - front_ceiling_height * scale1;
         let wall_y1_step = -scale_step * front_ceiling_height;
