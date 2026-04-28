@@ -209,7 +209,7 @@ impl SubSector {
 pub struct Seg {
     pub start: i16,
     pub end: i16,
-    pub angle: i16,
+    pub angle: f32,
     pub line: i16,
     pub dir: i16,
     pub offset_dist: i16,
@@ -220,12 +220,13 @@ pub struct Seg {
 impl Seg {
     pub fn new_from_bytes(bytes: &[u8]) -> Result<Vec<Self>> {
         bytes
-            .chunks(size_of::<Seg>() - size_of::<i16>() * 2)
+            .chunks(12)
             .map(|data| {
+                let angle = (read_i16(data, 4)? as f32) * 360.0 / 65536.0;
                 Ok(Self {
                     start: read_i16(data, 0)?,
                     end: read_i16(data, 2)?,
-                    angle: read_i16(data, 4)?,
+                    angle: if angle >= 0.0 { angle } else { angle + 360.0 },
                     line: read_i16(data, 6)?,
                     dir: read_i16(data, 8)?,
                     offset_dist: read_i16(data, 10)?,
