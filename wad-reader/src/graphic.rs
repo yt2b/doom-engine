@@ -17,11 +17,7 @@ pub struct Graphic {
 impl Graphic {
     pub fn new_from_wad(wad: &Wad) -> Result<Self> {
         // パレットを読み込む
-        let lump = wad
-            .lumps
-            .iter()
-            .find(|lump| lump.name == "PLAYPAL")
-            .ok_or_else(|| anyhow::anyhow!("Pallet named 'PLAYPAL' not found"))?;
+        let lump = wad.get_lump("PLAYPAL")?;
         let palettes = get_palettes(&lump.bytes);
         // スプライトを読み込む
         let start_idx = wad.get_lump_index("S_START")?;
