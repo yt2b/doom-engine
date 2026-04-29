@@ -10,12 +10,12 @@ pub mod map;
 mod read;
 
 use crate::{
-    graphic::get_palettes,
-    read::{read_i32, read_string},
-};
-use crate::{
     graphic::{Graphic, Patch},
     map::Map,
+};
+use crate::{
+    graphic::{create_textures, get_palettes},
+    read::{read_i32, read_string},
 };
 
 pub struct Wad {
@@ -46,6 +46,13 @@ impl Wad {
         Ok(Self { ident, lumps })
     }
 
+    fn get_lump(&self, name: &str) -> Result<&Lump> {
+        self.lumps
+            .iter()
+            .find(|lump| lump.name == name)
+            .ok_or_else(|| anyhow::anyhow!("Lump named '{}' not found", name))
+    }
+
     fn get_lump_index(&self, name: &str) -> Result<usize> {
         self.lumps
             .iter()
@@ -74,7 +81,34 @@ impl Wad {
         for lump in &self.lumps[start_idx + 1..end_idx] {
             sprites.insert(lump.name.clone(), Patch::new_from_bytes(&lump.bytes)?);
         }
-        Ok(Graphic::new(pallets, sprites))
+        // パッチ名を読み込む
+        let pnames = self.get_lump("PNAMES")?;
+        let num_patches = read_i32(&pnames.bytes, 0)? as usize;
+        let mut patch_names = Vec::new();
+        for i in 0..num_patches {
+            let name = read_string(&pnames.bytes, 4 + i * 8, 8)?;
+            patch_names.push(name.to_uppercase());
+        }
+        // テクスチャ用のパッチを読み込む
+        let mut texture_patches = HashMap::new();
+        for name in &patch_names {
+            if let Ok(lump) = self.get_lump(name) {
+                texture_patches.insert(name.clone(), Patch::new_from_bytes(&lump.bytes)?);
+            }
+        }
+        // テクスチャを読み込む
+        let mut textures = create_textures(self, "TEXTURE1")?;
+        if self.get_lump("TEXTURE2").is_ok() {
+            let mut textures2 = create_textures(self, "TEXTURE2")?;
+            textures.append(&mut textures2);
+        }
+        Ok(Graphic::new(
+            pallets,
+            sprites,
+            patch_names,
+            texture_patches,
+            textures,
+        ))
     }
 }
 
