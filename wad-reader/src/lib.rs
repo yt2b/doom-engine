@@ -1,6 +1,7 @@
+use crate::read::{read_i32, read_string};
+use crate::{graphic::Graphic, map::Map};
 use anyhow::Result;
 use std::{
-    collections::HashMap,
     fs::File,
     io::{BufReader, Read},
 };
@@ -8,15 +9,6 @@ use std::{
 pub mod graphic;
 pub mod map;
 mod read;
-
-use crate::{
-    graphic::{Graphic, Patch},
-    map::Map,
-};
-use crate::{
-    graphic::{create_textures, get_palettes},
-    read::{read_i32, read_string},
-};
 
 pub struct Wad {
     pub ident: String,
@@ -67,59 +59,7 @@ impl Wad {
     }
 
     pub fn read_graphic(&self) -> Result<Graphic> {
-        // パレットを読み込む
-        let lump = self
-            .lumps
-            .iter()
-            .find(|lump| lump.name == "PLAYPAL")
-            .ok_or_else(|| anyhow::anyhow!("Pallet named 'PLAYPAL' not found"))?;
-        let pallets = get_palettes(&lump.bytes);
-        // スプライトを読み込む
-        let mut sprites = HashMap::new();
-        let start_idx = self.get_lump_index("S_START")?;
-        let end_idx = self.get_lump_index("S_END")?;
-        for lump in &self.lumps[start_idx + 1..end_idx] {
-            sprites.insert(lump.name.clone(), Patch::new_from_bytes(&lump.bytes)?);
-        }
-        // パッチ名を読み込む
-        let pnames = self.get_lump("PNAMES")?;
-        let num_patches = read_i32(&pnames.bytes, 0)? as usize;
-        let mut patch_names = Vec::new();
-        for i in 0..num_patches {
-            let name = read_string(&pnames.bytes, 4 + i * 8, 8)?;
-            patch_names.push(name.to_uppercase());
-        }
-        // テクスチャ用のパッチを読み込む
-        let mut texture_patches = HashMap::new();
-        for name in &patch_names {
-            if let Ok(lump) = self.get_lump(name) {
-                texture_patches.insert(name.clone(), Patch::new_from_bytes(&lump.bytes)?);
-            }
-        }
-        // テクスチャを読み込む
-        let mut textures = create_textures(self, "TEXTURE1")?;
-        if self.get_lump("TEXTURE2").is_ok() {
-            let mut textures2 = create_textures(self, "TEXTURE2")?;
-            textures.append(&mut textures2);
-        }
-        // Flatを読み込む
-        let start_idx = self.get_lump_index("F_START")?;
-        let end_idx = self.get_lump_index("F_END")?;
-        let mut flats = HashMap::new();
-        for lump in &self.lumps[start_idx + 1..end_idx] {
-            if lump.bytes.len() != 64 * 64 {
-                continue;
-            }
-            flats.insert(lump.name.clone(), lump.bytes.clone());
-        }
-        Ok(Graphic::new(
-            pallets,
-            sprites,
-            patch_names,
-            texture_patches,
-            textures,
-            flats,
-        ))
+        Graphic::new_from_wad(self)
     }
 }
 

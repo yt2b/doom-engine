@@ -15,22 +15,60 @@ pub struct Graphic {
 }
 
 impl Graphic {
-    pub fn new(
-        palettes: Vec<Vec<(u8, u8, u8)>>,
-        sprites: HashMap<String, Patch>,
-        patch_names: Vec<String>,
-        texture_patches: HashMap<String, Patch>,
-        textures: Vec<Texture>,
-        flats: HashMap<String, Vec<u8>>,
-    ) -> Self {
-        Self {
+    pub fn new_from_wad(wad: &Wad) -> Result<Self> {
+        // パレットを読み込む
+        let lump = wad
+            .lumps
+            .iter()
+            .find(|lump| lump.name == "PLAYPAL")
+            .ok_or_else(|| anyhow::anyhow!("Pallet named 'PLAYPAL' not found"))?;
+        let palettes = get_palettes(&lump.bytes);
+        // スプライトを読み込む
+        let start_idx = wad.get_lump_index("S_START")?;
+        let end_idx = wad.get_lump_index("S_END")?;
+        let mut sprites = HashMap::new();
+        for lump in &wad.lumps[start_idx + 1..end_idx] {
+            sprites.insert(lump.name.clone(), Patch::new_from_bytes(&lump.bytes)?);
+        }
+        // パッチ名を読み込む
+        let pnames = wad.get_lump("PNAMES")?;
+        let num_patches = read_i32(&pnames.bytes, 0)? as usize;
+        let mut patch_names = Vec::new();
+        for i in 0..num_patches {
+            let name = read_string(&pnames.bytes, 4 + i * 8, 8)?;
+            patch_names.push(name.to_uppercase());
+        }
+        // テクスチャ用のパッチを読み込む
+        let mut texture_patches = HashMap::new();
+        for name in &patch_names {
+            if let Ok(lump) = wad.get_lump(name) {
+                texture_patches.insert(name.clone(), Patch::new_from_bytes(&lump.bytes)?);
+            }
+        }
+        // テクスチャを読み込む
+        let mut textures = create_textures(wad, "TEXTURE1")?;
+        if wad.get_lump("TEXTURE2").is_ok() {
+            let mut textures2 = create_textures(wad, "TEXTURE2")?;
+            textures.append(&mut textures2);
+        }
+        // Flatを読み込む
+        let start_idx = wad.get_lump_index("F_START")?;
+        let end_idx = wad.get_lump_index("F_END")?;
+        let mut flats = HashMap::new();
+        for lump in &wad.lumps[start_idx + 1..end_idx] {
+            if lump.bytes.len() != 64 * 64 {
+                continue;
+            }
+            flats.insert(lump.name.clone(), lump.bytes.clone());
+        }
+        Ok(Self {
             palettes,
             sprites,
             patch_names,
             texture_patches,
             textures,
             flats,
-        }
+        })
     }
 }
 
@@ -96,7 +134,7 @@ impl PatchColumn {
     }
 }
 
-pub fn create_textures(wad: &Wad, name: &str) -> Result<Vec<Texture>> {
+fn create_textures(wad: &Wad, name: &str) -> Result<Vec<Texture>> {
     let texture = wad.get_lump(name)?;
     let num_textures = read_i32(&texture.bytes, 0)? as usize;
     let offsets = (0..num_textures)
