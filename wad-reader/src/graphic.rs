@@ -11,6 +11,7 @@ pub struct Graphic {
     pub patch_names: Vec<String>,
     pub texture_patches: HashMap<String, Patch>,
     pub textures: Vec<Texture>,
+    pub flats: HashMap<String, Vec<u8>>,
 }
 
 impl Graphic {
@@ -20,6 +21,7 @@ impl Graphic {
         patch_names: Vec<String>,
         texture_patches: HashMap<String, Patch>,
         textures: Vec<Texture>,
+        flats: HashMap<String, Vec<u8>>,
     ) -> Self {
         Self {
             palettes,
@@ -27,6 +29,7 @@ impl Graphic {
             patch_names,
             texture_patches,
             textures,
+            flats,
         }
     }
 }

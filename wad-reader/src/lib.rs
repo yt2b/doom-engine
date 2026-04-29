@@ -102,12 +102,23 @@ impl Wad {
             let mut textures2 = create_textures(self, "TEXTURE2")?;
             textures.append(&mut textures2);
         }
+        // Flatを読み込む
+        let start_idx = self.get_lump_index("F_START")?;
+        let end_idx = self.get_lump_index("F_END")?;
+        let mut flats = HashMap::new();
+        for lump in &self.lumps[start_idx + 1..end_idx] {
+            if lump.bytes.len() != 64 * 64 {
+                continue;
+            }
+            flats.insert(lump.name.clone(), lump.bytes.clone());
+        }
         Ok(Graphic::new(
             pallets,
             sprites,
             patch_names,
             texture_patches,
             textures,
+            flats,
         ))
     }
 }
