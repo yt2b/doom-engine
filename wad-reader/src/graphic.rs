@@ -10,7 +10,7 @@ pub struct Graphic {
     pub sprites: HashMap<String, Patch>,
     pub patch_names: Vec<String>,
     pub texture_patches: HashMap<String, Patch>,
-    pub textures: Vec<Texture>,
+    pub textures: HashMap<String, Texture>,
     pub flats: HashMap<String, Vec<u8>>,
 }
 
@@ -44,8 +44,8 @@ impl Graphic {
         // テクスチャを読み込む
         let mut textures = create_textures(wad, "TEXTURE1", &patch_names, &texture_patches)?;
         if wad.get_lump("TEXTURE2").is_ok() {
-            let mut textures2 = create_textures(wad, "TEXTURE2", &patch_names, &texture_patches)?;
-            textures.append(&mut textures2);
+            let textures2 = create_textures(wad, "TEXTURE2", &patch_names, &texture_patches)?;
+            textures.extend(textures2);
         }
         // Flatを読み込む
         let start_idx = wad.get_lump_index("F_START")?;
@@ -141,13 +141,13 @@ fn create_textures(
     name: &str,
     patch_names: &[String],
     pathches: &HashMap<String, Patch>,
-) -> Result<Vec<Texture>> {
+) -> Result<HashMap<String, Texture>> {
     let texture = wad.get_lump(name)?;
     let num_textures = read_i32(&texture.bytes, 0)? as usize;
     let offsets = (0..num_textures)
         .map(|i| read_i32(&texture.bytes, 4 + i * 4))
         .collect::<Result<Vec<i32>>>()?;
-    let mut textures = Vec::new();
+    let mut textures = HashMap::new();
     for offset in offsets {
         let texture_offset = offset as usize;
         let name = read_string(&texture.bytes, texture_offset, 8)?;
@@ -173,22 +173,20 @@ fn create_textures(
                 }
             }
         }
-        textures.push(Texture::new(name, width, height, palettes));
+        textures.insert(name, Texture::new(width, height, palettes));
     }
     Ok(textures)
 }
 
 pub struct Texture {
-    pub name: String,
     pub width: usize,
     pub height: usize,
     pub palettes: Vec<Option<usize>>,
 }
 
 impl Texture {
-    pub fn new(name: String, width: usize, height: usize, palettes: Vec<Option<usize>>) -> Self {
+    pub fn new(width: usize, height: usize, palettes: Vec<Option<usize>>) -> Self {
         Self {
-            name,
             width,
             height,
             palettes,
