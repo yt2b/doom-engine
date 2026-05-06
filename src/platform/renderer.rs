@@ -29,12 +29,7 @@ impl Renderer {
         Self {
             graphic,
             map_renderer: MapRenderer::new(640.0, -280.0, 0.15),
-            view_renderer: ViewRenderer::new(
-                320.0 * 1.5,
-                240.0 * 1.5,
-                Vector2::new(20.0, 40.0),
-                PLAYER_FOV,
-            ),
+            view_renderer: ViewRenderer::new(320.0, 200.0, Vector2::new(20.0, 40.0), PLAYER_FOV),
         }
     }
 
