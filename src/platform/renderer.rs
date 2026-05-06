@@ -218,9 +218,9 @@ impl ViewRenderer {
     }
 
     fn fov_x_to_angle(&self, fov_x: i16) -> f32 {
-        // 0からwidth-1までのfov_xをh_fovから-h_fovに変換
-        let x = fov_x as f32 - (self.half_width - 1.0);
-        -(x / self.half_width).atan().to_degrees()
+        // 0からwidthまでのfov_xをh_fovから-h_fovに変換
+        let x = self.half_width - fov_x as f32;
+        (x / self.half_width).atan().to_degrees()
     }
 
     pub fn render(&mut self, mb: &mut MeshBuilder, map: &Map, player: &Player) -> Result<()> {
