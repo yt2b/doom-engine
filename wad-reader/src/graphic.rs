@@ -42,9 +42,9 @@ impl Graphic {
             }
         }
         // テクスチャを読み込む
-        let mut textures = create_textures(wad, "TEXTURE1")?;
+        let mut textures = create_textures(wad, "TEXTURE1", &patch_names, &texture_patches)?;
         if wad.get_lump("TEXTURE2").is_ok() {
-            let mut textures2 = create_textures(wad, "TEXTURE2")?;
+            let mut textures2 = create_textures(wad, "TEXTURE2", &patch_names, &texture_patches)?;
             textures.append(&mut textures2);
         }
         // Flatを読み込む
@@ -82,35 +82,41 @@ pub fn get_palettes(bytes: &[u8]) -> Vec<Vec<(u8, u8, u8)>> {
 }
 
 pub struct Patch {
-    pub width: u16,
-    pub height: u16,
+    pub width: usize,
+    pub height: usize,
     pub left_offset: i16,
     pub top_offset: i16,
-    pub patch_columns: Vec<PatchColumn>,
+    pub palettes: Vec<Option<usize>>,
 }
 
 impl Patch {
     pub fn new_from_bytes(bytes: &[u8]) -> Result<Self> {
-        let width = read_u16(bytes, 0)?;
-        // PatchColumnを読み込む
-        let mut patch_columns = Vec::new();
-        for i in 0..width {
-            let offset = read_u32(bytes, 8 + i as usize * 4)? as usize;
+        let width = read_u16(bytes, 0)? as usize;
+        let height = read_u16(bytes, 2)? as usize;
+        let mut palettes = vec![None; width * height];
+        for x in 0..width {
+            // PatchColumnを読み込む
+            let offset = read_u32(bytes, 8 + x * 4)? as usize;
             let patch_column = PatchColumn::new_from_bytes(&bytes[offset..])?;
-            patch_columns.push(patch_column);
+            for (start_y, data) in &patch_column.0 {
+                for (offset_y, idx) in data.iter().enumerate() {
+                    let y = *start_y as usize + offset_y;
+                    palettes[y * width + x] = Some(*idx as usize);
+                }
+            }
         }
         Ok(Self {
             width,
-            height: read_u16(bytes, 2)?,
+            height,
             left_offset: read_i16(bytes, 4)?,
             top_offset: read_i16(bytes, 6)?,
-            patch_columns,
+            palettes,
         })
     }
 }
 
 // (y座標のオフセット, ピクセルデータ)のタプルリスト
-pub struct PatchColumn(pub Vec<(u8, Vec<u8>)>);
+struct PatchColumn(pub Vec<(u8, Vec<u8>)>);
 
 impl PatchColumn {
     pub fn new_from_bytes(bytes: &[u8]) -> Result<Self> {
@@ -130,7 +136,12 @@ impl PatchColumn {
     }
 }
 
-fn create_textures(wad: &Wad, name: &str) -> Result<Vec<Texture>> {
+fn create_textures(
+    wad: &Wad,
+    name: &str,
+    patch_names: &[String],
+    pathches: &HashMap<String, Patch>,
+) -> Result<Vec<Texture>> {
     let texture = wad.get_lump(name)?;
     let num_textures = read_i32(&texture.bytes, 0)? as usize;
     let offsets = (0..num_textures)
@@ -140,52 +151,66 @@ fn create_textures(wad: &Wad, name: &str) -> Result<Vec<Texture>> {
     for offset in offsets {
         let texture_offset = offset as usize;
         let name = read_string(&texture.bytes, texture_offset, 8)?;
-        let width = read_u16(&texture.bytes, texture_offset + 12)?;
-        let height = read_u16(&texture.bytes, texture_offset + 14)?;
+        let width = read_u16(&texture.bytes, texture_offset + 12)? as usize;
+        let height = read_u16(&texture.bytes, texture_offset + 14)? as usize;
         let num_patches = read_i16(&texture.bytes, texture_offset + 20)? as usize;
-        let mut patches = Vec::new();
+        let mut palettes = vec![None; width * height];
         for i in 0..num_patches {
             let patch_offset = texture_offset + 22 + i * 10;
-            let x_offset = read_i16(&texture.bytes, patch_offset)?;
-            let y_offset = read_i16(&texture.bytes, patch_offset + 2)?;
-            let idx = read_i16(&texture.bytes, patch_offset + 4)? as usize;
-            patches.push(TexturePatch::new(x_offset, y_offset, idx));
+            let texture_patch = TexturePatch::new_from_bytes(&texture.bytes[patch_offset..])?;
+            let patch = &pathches[&patch_names[texture_patch.idx]];
+            for x in 0..patch.width {
+                for y in 0..patch.height {
+                    let tex_x = x as i16 + texture_patch.offset_x;
+                    let tex_y = y as i16 + texture_patch.offset_y;
+                    if tex_x < 0 || tex_x >= width as i16 || tex_y < 0 || tex_y >= height as i16 {
+                        continue;
+                    }
+                    if let Some(palette_idx) = patch.palettes[y * patch.width + x] {
+                        let tex_idx = tex_y as usize * width + tex_x as usize;
+                        palettes[tex_idx] = Some(palette_idx);
+                    }
+                }
+            }
         }
-        textures.push(Texture::new(name, width, height, patches));
+        textures.push(Texture::new(name, width, height, palettes));
     }
     Ok(textures)
 }
 
 pub struct Texture {
     pub name: String,
-    pub width: u16,
-    pub height: u16,
-    pub patches: Vec<TexturePatch>,
+    pub width: usize,
+    pub height: usize,
+    pub palettes: Vec<Option<usize>>,
 }
 
 impl Texture {
-    pub fn new(name: String, width: u16, height: u16, patches: Vec<TexturePatch>) -> Self {
+    pub fn new(name: String, width: usize, height: usize, palettes: Vec<Option<usize>>) -> Self {
         Self {
             name,
             width,
             height,
-            patches,
+            palettes,
         }
     }
 }
 
-pub struct TexturePatch {
+struct TexturePatch {
     pub offset_x: i16,
     pub offset_y: i16,
     pub idx: usize,
 }
 
 impl TexturePatch {
-    pub fn new(offset_x: i16, offset_y: i16, idx: usize) -> Self {
-        Self {
+    pub fn new_from_bytes(bytes: &[u8]) -> Result<Self> {
+        let offset_x = read_i16(bytes, 0)?;
+        let offset_y = read_i16(bytes, 2)?;
+        let idx = read_i16(bytes, 4)? as usize;
+        Ok(Self {
             offset_x,
             offset_y,
             idx,
-        }
+        })
     }
 }
