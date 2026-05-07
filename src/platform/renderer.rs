@@ -12,7 +12,7 @@ use ggez::{
     glam,
     graphics::{Color, DrawMode, FillOptions, MeshBuilder, Rect},
 };
-use wad_reader::graphic::Graphic;
+use wad_reader::graphic::{Graphic, Texture};
 use wad_reader::map::{Map, Position, Seg, SubSector};
 
 pub const WIDTH: f32 = 1280.0;
@@ -40,7 +40,8 @@ impl Renderer {
             .render_player(mb, &doom.player, Color::GREEN)?;
         self.map_renderer
             .render_insight_subsector(mb, &doom.player, &doom.map, Color::YELLOW)?;
-        self.view_renderer.render(mb, &doom.map, &doom.player)?;
+        self.view_renderer
+            .render(mb, &self.graphic, &doom.map, &doom.player)?;
         Ok(())
     }
 }
@@ -223,13 +224,19 @@ impl ViewRenderer {
         (x / self.half_width).atan().to_degrees()
     }
 
-    pub fn render(&mut self, mb: &mut MeshBuilder, map: &Map, player: &Player) -> Result<()> {
+    pub fn render(
+        &mut self,
+        mb: &mut MeshBuilder,
+        graphic: &Graphic,
+        map: &Map,
+        player: &Player,
+    ) -> Result<()> {
         self.solid_seg.initialize();
         self.upper_clip.fill(-1.0);
         self.lower_clip.fill(self.height);
         // プレイヤーから見えるサブセクターを描画する
         for idx in get_subsector_indices(map, player) {
-            self.render_subsector(mb, &map.subsectors[idx], map, player)?;
+            self.render_subsector(mb, graphic, &map.subsectors[idx], map, player)?;
         }
         let bounds = Rect::new(self.offset.x, self.offset.y, self.width, self.height);
         let mode = DrawMode::Stroke(StrokeOptions::default());
@@ -240,13 +247,14 @@ impl ViewRenderer {
     pub fn render_subsector(
         &mut self,
         mb: &mut MeshBuilder,
+        graphic: &Graphic,
         sub_sector: &SubSector,
         map: &Map,
         player: &Player,
     ) -> Result<()> {
         for i in 0..sub_sector.seg_count {
             let seg = &map.segs[(sub_sector.seg_idx + i) as usize];
-            self.render_seg(mb, seg, map, player)?;
+            self.render_seg(mb, graphic, seg, map, player)?;
         }
         Ok(())
     }
@@ -254,6 +262,7 @@ impl ViewRenderer {
     pub fn render_seg(
         &mut self,
         mb: &mut MeshBuilder,
+        graphic: &Graphic,
         seg: &wad_reader::map::Seg,
         map: &Map,
         player: &Player,
@@ -277,7 +286,7 @@ impl ViewRenderer {
                 );
                 let ranges = self.solid_seg.get_renderable_ranges(fov_x);
                 for range in &ranges {
-                    self.render_solid_wall(mb, map, seg, player, line, *range)?;
+                    self.render_solid_wall(mb, graphic, map, seg, player, line, *range)?;
                 }
                 for range in ranges {
                     self.solid_seg.set_renderable_range(range);
@@ -357,6 +366,7 @@ impl ViewRenderer {
     pub fn render_solid_wall(
         &mut self,
         mb: &mut MeshBuilder,
+        graphic: &Graphic,
         map: &Map,
         seg: &Seg,
         player: &Player,
@@ -371,6 +381,7 @@ impl ViewRenderer {
         let wall_texture = &sidedef.middle_texture_name;
         let floor_texture = &sector.floor_texture_name;
         let light_level = sector.light_level;
+        let texture = &graphic.textures[wall_texture];
         // プレイヤーの視点からの高さ
         let ceiling_height = sector.ceiling_height as f32 - player.view_height;
         let floor_height = sector.floor_height as f32 - player.view_height;
@@ -379,11 +390,30 @@ impl ViewRenderer {
         let is_render_wall = sidedef.middle_texture_name != "-";
         let is_render_floor = floor_height < 0.0;
 
+        // 線分の角度 + 90度
+        let normal_angle = seg.angle + 90.0;
+        // 線分の角度 + 90度　- 壁の端点の角度 ※法線の距離を求めるのに使う
+        let offset_angle = normal_angle - (line.start - player.pos).angle();
+        // プレイヤーと点の距離
+        let hypotenuse = line.start.dist(&player.pos);
+        // 壁の法線距離 ※「cos(offset_angle) = dits / hypotenuse」の変形
+        let dist = hypotenuse * offset_angle.to_radians().cos();
         let (scale1, scale_step) = self.calc_line_scale(seg.angle, line, player, fov_x);
         let wall_y1 = (self.height / 2.0) - ceiling_height * scale1;
         let wall_y1_step = -scale_step * ceiling_height;
         let wall_y2 = (self.height / 2.0) - floor_height * scale1;
         let wall_y2_step = -scale_step * floor_height;
+        // 垂線との交点から端点までの距離 ※「sin(offset_angle) = opposite / hypotenuse」の変形
+        let opposite = hypotenuse * offset_angle.to_radians().sin();
+        // oppositeにテクスチャのオフセットを足したものが、テクスチャのどこを描画するかの基準になる
+        let texture_offset = opposite + (seg.offset_dist + sidedef.offset_x) as f32;
+        // 壁の法線と視線の角度差
+        let center_angle = normal_angle - player.angle;
+        let texture_y_offset = if linedef.flags & 0x10 > 0 {
+            floor_height + texture.width as f32
+        } else {
+            ceiling_height
+        } + sidedef.offset_y as f32;
 
         for x in fov_x.0..(fov_x.1 + 1) {
             let idx_x = x as usize;
@@ -400,7 +430,23 @@ impl ViewRenderer {
                 // 壁の上端は壁全体の上端をクリップ、下端は壁全体の下端をクリップして描画する
                 let w_y1 = y1.max(self.upper_clip[idx_x] + 1.0);
                 let w_y2 = y2.min(self.lower_clip[idx_x] - 1.0);
-                self.render_line(mb, x, w_y1, w_y2, wall_texture, light_level)?;
+                // 角度差からテクスチャのどこを描画するかを決める
+                let angle = center_angle - self.fov_x_to_angle(x);
+                let texture_column = (dist * angle.to_radians().tan() - texture_offset) as i16;
+                // 倍率の逆数をかけてテクスチャの大きさを補正する
+                let inverse_scale = 1.0 / (scale1 + scale_step * diff);
+                self.render_texture(
+                    mb,
+                    x,
+                    w_y1,
+                    w_y2,
+                    texture,
+                    texture_column,
+                    texture_y_offset,
+                    inverse_scale,
+                    light_level,
+                    &graphic.palettes[0],
+                )?;
             }
             if is_render_floor {
                 // 床の上端は壁全体の下端とクリップの上端の大きい方、下端はクリップの下端
@@ -554,6 +600,48 @@ impl ViewRenderer {
                     self.lower_clip[idx_x] = f_y1
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn render_texture(
+        &mut self,
+        mb: &mut MeshBuilder,
+        x: i16,
+        y1: f32,
+        y2: f32,
+        texture: &Texture,
+        texture_column: i16,
+        texture_y_offset: f32,
+        inverse_scale: f32,
+        light_level: i16,
+        palettes: &[(u8, u8, u8)],
+    ) -> Result<()> {
+        if y1 > y2 {
+            return Ok(());
+        }
+        let clipped_y1 = y1.clamp(0.0, self.height) as usize;
+        let clipped_y2 = (y2 + 1.0).clamp(0.0, self.height) as usize;
+        let texture_x = texture_column.rem_euclid(texture.width as i16) as usize;
+        let mut texture_y =
+            texture_y_offset + (clipped_y1 as f32 - self.half_height) * inverse_scale;
+        for y in clipped_y1..clipped_y2 + 1 {
+            let idx = (texture_y as usize % texture.height) * texture.width + texture_x;
+            if let Some(palette_idx) = texture.palettes[idx] {
+                // TODO: light_levelから適切な色を取得する
+                let rgb = palettes[palette_idx];
+                let color = Color::from_rgb(rgb.0, rgb.1, rgb.2);
+                let offset_x = self.offset.x + x as f32;
+                let offset_y = self.offset.y + y as f32;
+                mb.circle(
+                    DrawMode::Fill(FillOptions::default()),
+                    glam::vec2(offset_x, offset_y),
+                    1.0,
+                    0.1,
+                    color,
+                )?;
+            }
+            texture_y += inverse_scale
         }
         Ok(())
     }
