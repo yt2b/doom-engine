@@ -340,13 +340,13 @@ impl ViewRenderer {
     fn calc_line_scale(
         &self,
         normal_angle: f32,
-        dist: f32,
+        normal_dist: f32,
         player_angle: f32,
         fov_x: (i16, i16),
     ) -> (f32, f32) {
-        // (視界のx座標、線分の角度 + 90度、壁の垂線の距離、プレイヤーの角度）から倍率を求める
-        let scale1 = self.calc_scale(fov_x.0, normal_angle, dist, player_angle);
-        let scale2 = self.calc_scale(fov_x.1, normal_angle, dist, player_angle);
+        // (視界のx座標、線分の角度 + 90度、法線の距離、プレイヤーの角度）から倍率を求める
+        let scale1 = self.calc_scale(fov_x.0, normal_angle, normal_dist, player_angle);
+        let scale2 = self.calc_scale(fov_x.1, normal_angle, normal_dist, player_angle);
         let scale_step = if (fov_x.1 - fov_x.0) > 0 {
             (scale2 - scale1) / (fov_x.1 - fov_x.0) as f32
         } else {
@@ -388,9 +388,10 @@ impl ViewRenderer {
         let offset_angle = normal_angle - (line.start - player.pos).angle();
         // プレイヤーと点の距離
         let hypotenuse = line.start.dist(&player.pos);
-        // 壁の法線距離 ※「cos(offset_angle) = dits / hypotenuse」の変形
-        let dist = hypotenuse * offset_angle.to_radians().cos();
-        let (scale1, scale_step) = self.calc_line_scale(normal_angle, dist, player.angle, fov_x);
+        // 壁の法線距離 ※「cos(offset_angle) = normal_dist / hypotenuse」の変形
+        let normal_dist = hypotenuse * offset_angle.to_radians().cos();
+        let (scale1, scale_step) =
+            self.calc_line_scale(normal_angle, normal_dist, player.angle, fov_x);
         let wall_y1 = (self.height / 2.0) - ceiling_height * scale1;
         let wall_y1_step = -scale_step * ceiling_height;
         let wall_y2 = (self.height / 2.0) - floor_height * scale1;
@@ -424,7 +425,8 @@ impl ViewRenderer {
                 let w_y2 = y2.min(self.lower_clip[idx_x] - 1.0);
                 // 角度差からテクスチャのどこを描画するかを決める
                 let angle = center_angle - self.fov_x_to_angle(x);
-                let texture_column = (dist * angle.to_radians().tan() - texture_offset) as i16;
+                let texture_column =
+                    (normal_dist * angle.to_radians().tan() - texture_offset) as i16;
                 // 倍率の逆数をかけてテクスチャの大きさを補正する
                 let inverse_scale = 1.0 / (scale1 + scale_step * diff);
                 self.render_texture(
@@ -505,9 +507,10 @@ impl ViewRenderer {
         let offset_angle = normal_angle - (line.start - player.pos).angle();
         // プレイヤーと点の距離
         let hypotenuse = line.start.dist(&player.pos);
-        // 壁の法線距離 ※「cos(offset_angle) = dits / hypotenuse」の変形
-        let dist = hypotenuse * offset_angle.to_radians().cos();
-        let (scale1, scale_step) = self.calc_line_scale(normal_angle, dist, player.angle, fov_x);
+        // 壁の法線距離 ※「cos(offset_angle) = normal_dist / hypotenuse」の変形
+        let normal_dist = hypotenuse * offset_angle.to_radians().cos();
+        let (scale1, scale_step) =
+            self.calc_line_scale(normal_angle, normal_dist, player.angle, fov_x);
         // 壁全体の上端と下端のy座標と、y座標の変化量
         let wall_y1 = self.half_height - front_ceiling_height * scale1;
         let wall_y1_step = -scale_step * front_ceiling_height;
@@ -529,7 +532,6 @@ impl ViewRenderer {
         } else {
             back_floor_height
         } + sidedef.offset_y as f32;
-
         // 垂線との交点から端点までの距離 ※「sin(offset_angle) = opposite / hypotenuse」の変形
         let opposite = hypotenuse * offset_angle.to_radians().sin();
         // oppositeにテクスチャのオフセットを足したものが、テクスチャのどこを描画するかの基準になる
@@ -569,7 +571,7 @@ impl ViewRenderer {
             let wall_y2 = wall_y2 + wall_y2_step * diff;
             // 角度差からテクスチャのどこを描画するかを決める
             let angle = center_angle - self.fov_x_to_angle(x);
-            let texture_column = (dist * angle.to_radians().tan() - texture_offset) as i16;
+            let texture_column = (normal_dist * angle.to_radians().tan() - texture_offset) as i16;
             // 倍率の逆数をかけてテクスチャの大きさを補正する
             let inverse_scale = 1.0 / (scale1 + scale_step * diff);
 
