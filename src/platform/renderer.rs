@@ -304,7 +304,7 @@ impl ViewRenderer {
                     self.angle_to_fov_x(end_angle),
                 );
                 for range in self.solid_seg.get_renderable_ranges(fov_x) {
-                    self.render_portal_wall(mb, map, seg, player, line, range)?;
+                    self.render_portal_wall(mb, graphic, map, seg, player, line, range)?;
                 }
                 return Ok(());
             }
@@ -320,7 +320,7 @@ impl ViewRenderer {
                 self.angle_to_fov_x(end_angle),
             );
             for range in self.solid_seg.get_renderable_ranges(fov_x) {
-                self.render_portal_wall(mb, map, seg, player, line, range)?;
+                self.render_portal_wall(mb, graphic, map, seg, player, line, range)?;
             }
         }
         Ok(())
@@ -445,7 +445,7 @@ impl ViewRenderer {
                     texture_y_offset,
                     inverse_scale,
                     light_level,
-                    &graphic.palettes[0],
+                    graphic,
                 )?;
             }
             if is_render_floor {
@@ -461,6 +461,7 @@ impl ViewRenderer {
     fn render_portal_wall(
         &mut self,
         mb: &mut MeshBuilder,
+        graphic: &Graphic,
         map: &Map,
         seg: &Seg,
         player: &Player,
@@ -468,6 +469,7 @@ impl ViewRenderer {
         fov_x: (i16, i16),
     ) -> Result<()> {
         let linedef = &map.linedefs[seg.line as usize];
+        let sidedef = &map.sidedefs[linedef.front as usize];
         let front_sector = &map.sectors[seg.front_sector as usize];
         let back_sector = &map.sectors[seg.back_sector as usize];
         let front_sidedef = &map.sidedefs[linedef.front as usize];
@@ -505,12 +507,43 @@ impl ViewRenderer {
             return Ok(());
         }
 
+        // 線分の角度 + 90度
+        let normal_angle = seg.angle + 90.0;
+        // 線分の角度 + 90度　- 壁の端点の角度 ※法線の距離を求めるのに使う
+        let offset_angle = normal_angle - (line.start - player.pos).angle();
+        // プレイヤーと点の距離
+        let hypotenuse = line.start.dist(&player.pos);
+        // 壁の法線距離 ※「cos(offset_angle) = dits / hypotenuse」の変形
+        let dist = hypotenuse * offset_angle.to_radians().cos();
         let (scale1, scale_step) = self.calc_line_scale(seg.angle, line, player, fov_x);
         // 壁全体の上端と下端のy座標と、y座標の変化量
         let wall_y1 = self.half_height - front_ceiling_height * scale1;
         let wall_y1_step = -scale_step * front_ceiling_height;
         let wall_y2 = self.half_height - front_floor_height * scale1;
         let wall_y2_step = -scale_step * front_floor_height;
+
+        let upper_wall_offset = if is_render_upper_wall {
+            (if linedef.flags & 0x08 > 0 {
+                front_ceiling_height
+            } else {
+                let upper_wall_texture = &graphic.textures[upper_wall_texture];
+                back_ceiling_height + upper_wall_texture.height as f32
+            }) + sidedef.offset_y as f32
+        } else {
+            0.0
+        };
+        let lower_wall_offset = if linedef.flags & 0x10 > 0 {
+            front_ceiling_height
+        } else {
+            front_floor_height
+        } + sidedef.offset_y as f32;
+
+        // 垂線との交点から端点までの距離 ※「sin(offset_angle) = opposite / hypotenuse」の変形
+        let opposite = hypotenuse * offset_angle.to_radians().sin();
+        // oppositeにテクスチャのオフセットを足したものが、テクスチャのどこを描画するかの基準になる
+        let texture_offset = opposite + (seg.offset_dist + sidedef.offset_x) as f32;
+        // 壁の法線と視線の角度差
+        let center_angle = normal_angle - player.angle;
 
         // portalの上端のy座標と、y座標の変化量
         let (portal_y1, portal_y1_step) =
@@ -542,6 +575,11 @@ impl ViewRenderer {
             let diff = (x - fov_x.0) as f32;
             let wall_y1 = wall_y1 - 1.0 + wall_y1_step * diff;
             let wall_y2 = wall_y2 + wall_y2_step * diff;
+            // 角度差からテクスチャのどこを描画するかを決める
+            let angle = center_angle - self.fov_x_to_angle(x);
+            let texture_column = (dist * angle.to_radians().tan() - texture_offset) as i16;
+            // 倍率の逆数をかけてテクスチャの大きさを補正する
+            let inverse_scale = 1.0 / (scale1 + scale_step * diff);
 
             if is_render_upper_wall {
                 let portal_y1 = portal_y1 + portal_y1_step * diff;
@@ -558,7 +596,18 @@ impl ViewRenderer {
                 // upper_wallの上端と下端をクリップして描画する
                 let w_y1 = upper_wall_y1.max(self.upper_clip[idx_x] + 1.0);
                 let w_y2 = upper_wall_y2.min(self.lower_clip[idx_x] - 1.0);
-                self.render_line(mb, x, w_y1, w_y2, upper_wall_texture, light_level)?;
+                self.render_texture(
+                    mb,
+                    x,
+                    w_y1,
+                    w_y2,
+                    &graphic.textures[upper_wall_texture],
+                    texture_column,
+                    upper_wall_offset,
+                    inverse_scale,
+                    light_level,
+                    graphic,
+                )?;
                 if self.upper_clip[idx_x] < w_y2 {
                     self.upper_clip[idx_x] = w_y2
                 }
@@ -585,7 +634,19 @@ impl ViewRenderer {
                 let w_y1 = (portal_y2 - 1.0).max(self.upper_clip[idx_x] + 1.0);
                 // lower_wallの下端は壁全体の下端とクリップの下端の小さい方
                 let w_y2 = wall_y2.min(self.lower_clip[idx_x] - 1.0);
-                self.render_line(mb, x, w_y1, w_y2, lower_wall_texture, light_level)?;
+                //self.render_line(mb, x, w_y1, w_y2, lower_wall_texture, light_level)?;
+                self.render_texture(
+                    mb,
+                    x,
+                    w_y1,
+                    w_y2,
+                    &graphic.textures[lower_wall_texture],
+                    texture_column,
+                    lower_wall_offset,
+                    inverse_scale,
+                    light_level,
+                    graphic,
+                )?;
                 if self.lower_clip[idx_x] > w_y1 {
                     self.lower_clip[idx_x] = w_y1
                 }
@@ -615,7 +676,7 @@ impl ViewRenderer {
         texture_y_offset: f32,
         inverse_scale: f32,
         light_level: i16,
-        palettes: &[(u8, u8, u8)],
+        graphic: &Graphic,
     ) -> Result<()> {
         if y1 > y2 {
             return Ok(());
@@ -629,7 +690,7 @@ impl ViewRenderer {
             let idx = (texture_y as usize % texture.height) * texture.width + texture_x;
             if let Some(palette_idx) = texture.palettes[idx] {
                 // TODO: light_levelから適切な色を取得する
-                let rgb = palettes[palette_idx];
+                let rgb = graphic.palettes[0][palette_idx];
                 let color = Color::from_rgb(rgb.0, rgb.1, rgb.2);
                 let offset_x = self.offset.x + x as f32;
                 let offset_y = self.offset.y + y as f32;
