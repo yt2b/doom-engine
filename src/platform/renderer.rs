@@ -535,7 +535,7 @@ impl ViewRenderer {
         let lower_wall_offset = if linedef.flags & 0x10 > 0 {
             front_ceiling_height
         } else {
-            front_floor_height
+            back_floor_height
         } + sidedef.offset_y as f32;
 
         // 垂線との交点から端点までの距離 ※「sin(offset_angle) = opposite / hypotenuse」の変形
