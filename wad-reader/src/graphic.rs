@@ -5,13 +5,15 @@ use crate::{
 use anyhow::Result;
 use std::collections::HashMap;
 
+pub const FLAT_SIZE: usize = 64;
+
 pub struct Graphic {
     pub palettes: Vec<Vec<(u8, u8, u8)>>,
     pub sprites: HashMap<String, Patch>,
     pub patch_names: Vec<String>,
     pub texture_patches: HashMap<String, Patch>,
     pub textures: HashMap<String, Texture>,
-    pub flats: HashMap<String, Vec<u8>>,
+    pub flats: HashMap<String, Vec<usize>>,
 }
 
 impl Graphic {
@@ -52,10 +54,15 @@ impl Graphic {
         let end_idx = wad.get_lump_index("F_END")?;
         let mut flats = HashMap::new();
         for lump in &wad.lumps[start_idx + 1..end_idx] {
-            if lump.bytes.len() != 64 * 64 {
+            if lump.bytes.len() != FLAT_SIZE * FLAT_SIZE {
                 continue;
             }
-            flats.insert(lump.name.clone(), lump.bytes.clone());
+            let pallets = lump
+                .bytes
+                .iter()
+                .map(|&idx| idx as usize)
+                .collect::<Vec<usize>>();
+            flats.insert(lump.name.clone(), pallets);
         }
         Ok(Self {
             palettes,
