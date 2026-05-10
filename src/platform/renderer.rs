@@ -12,7 +12,7 @@ use ggez::{
     glam,
     graphics::{Color, DrawMode, FillOptions, MeshBuilder, Rect},
 };
-use wad_reader::graphic::{Graphic, Texture};
+use wad_reader::graphic::{FLAT_SIZE, Graphic, Texture};
 use wad_reader::map::{Map, Position, Seg, SubSector};
 
 pub const WIDTH: f32 = 1280.0;
@@ -193,7 +193,6 @@ struct ViewRenderer {
     solid_seg: SolidSeg,
     upper_clip: Vec<f32>,
     lower_clip: Vec<f32>,
-    color_map: HashMap<String, Color>,
 }
 
 impl ViewRenderer {
@@ -210,7 +209,6 @@ impl ViewRenderer {
             solid_seg: SolidSeg::new(width as i16),
             upper_clip: vec![-1.0; width as usize],
             lower_clip: vec![height; width as usize],
-            color_map: HashMap::new(),
         }
     }
 
@@ -417,7 +415,17 @@ impl ViewRenderer {
                 // 天井の上端はクリップの上端、下端は壁全体の上端とクリップの下端の小さい方
                 let c_y1 = self.upper_clip[idx_x] + 1.0;
                 let c_y2 = (y1 - 1.0).min(self.lower_clip[idx_x] - 1.0);
-                self.render_line(mb, x, c_y1, c_y2, ceiling_texture, light_level)?;
+                self.render_flat(
+                    mb,
+                    player,
+                    x,
+                    c_y1,
+                    c_y2,
+                    ceiling_texture,
+                    ceiling_height,
+                    light_level,
+                    graphic,
+                )?;
             }
             if is_render_wall {
                 // 壁の上端は壁全体の上端をクリップ、下端は壁全体の下端をクリップして描画する
@@ -446,7 +454,17 @@ impl ViewRenderer {
                 // 床の上端は壁全体の下端とクリップの上端の大きい方、下端はクリップの下端
                 let f_y1 = (y2 + 1.0).max(self.upper_clip[idx_x] + 1.0);
                 let f_y2 = self.lower_clip[idx_x] - 1.0;
-                self.render_line(mb, x, f_y1, f_y2, floor_texture, light_level)?;
+                self.render_flat(
+                    mb,
+                    player,
+                    x,
+                    f_y1,
+                    f_y2,
+                    floor_texture,
+                    floor_height,
+                    light_level,
+                    graphic,
+                )?;
             }
         }
         Ok(())
@@ -585,7 +603,17 @@ impl ViewRenderer {
                     // 天井の上端はクリップの上端、下端は壁全体の上端とクリップの下端の小さい方
                     let c_y1 = self.upper_clip[idx_x] + 1.0;
                     let c_y2 = (wall_y1 - 1.0).min(self.lower_clip[idx_x] - 1.0);
-                    self.render_line(mb, x, c_y1, c_y2, ceiling_texture, light_level)?;
+                    self.render_flat(
+                        mb,
+                        player,
+                        x,
+                        c_y1,
+                        c_y2,
+                        ceiling_texture,
+                        front_ceiling_height,
+                        light_level,
+                        graphic,
+                    )?;
                 }
                 // upper_wallの上端と下端をクリップして描画する
                 let w_y1 = upper_wall_y1.max(self.upper_clip[idx_x] + 1.0);
@@ -611,7 +639,17 @@ impl ViewRenderer {
                 let c_y1 = self.upper_clip[idx_x] + 1.0;
                 // 天井の下端は壁全体の上端とクリップの下端の小さい方
                 let c_y2 = (wall_y1 - 1.0).min(self.lower_clip[idx_x] - 1.0);
-                self.render_line(mb, x, c_y1, c_y2, ceiling_texture, light_level)?;
+                self.render_flat(
+                    mb,
+                    player,
+                    x,
+                    c_y1,
+                    c_y2,
+                    ceiling_texture,
+                    front_ceiling_height,
+                    light_level,
+                    graphic,
+                )?;
                 if self.upper_clip[idx_x] < c_y2 {
                     self.upper_clip[idx_x] = c_y2
                 }
@@ -621,14 +659,23 @@ impl ViewRenderer {
                     // 床の上端は壁全体の下端とクリップの上端の大きい方、下端はクリップの下端
                     let f_y1 = (wall_y2 + 1.0).max(self.upper_clip[idx_x] + 1.0);
                     let f_y2 = self.lower_clip[idx_x] - 1.0;
-                    self.render_line(mb, x, f_y1, f_y2, floor_texture, light_level)?;
+                    self.render_flat(
+                        mb,
+                        player,
+                        x,
+                        f_y1,
+                        f_y2,
+                        floor_texture,
+                        front_floor_height,
+                        light_level,
+                        graphic,
+                    )?;
                 }
                 let portal_y2 = portal_y2 + portal_y2_step * diff;
                 // lower_wallの上端はportalの下端とクリップの上端の大きい方
                 let w_y1 = (portal_y2 - 1.0).max(self.upper_clip[idx_x] + 1.0);
                 // lower_wallの下端は壁全体の下端とクリップの下端の小さい方
                 let w_y2 = wall_y2.min(self.lower_clip[idx_x] - 1.0);
-                //self.render_line(mb, x, w_y1, w_y2, lower_wall_texture, light_level)?;
                 self.render_texture(
                     mb,
                     x,
@@ -650,7 +697,17 @@ impl ViewRenderer {
                 let f_y1 = (wall_y2 + 1.0).max(self.upper_clip[idx_x] + 1.0);
                 // 床の下端はクリップの下端
                 let f_y2 = self.lower_clip[idx_x] - 1.0;
-                self.render_line(mb, x, f_y1, f_y2, floor_texture, light_level)?;
+                self.render_flat(
+                    mb,
+                    player,
+                    x,
+                    f_y1,
+                    f_y2,
+                    floor_texture,
+                    front_floor_height,
+                    light_level,
+                    graphic,
+                )?;
                 if self.lower_clip[idx_x] > wall_y2 + 1.0 {
                     self.lower_clip[idx_x] = f_y1
                 }
@@ -701,44 +758,129 @@ impl ViewRenderer {
         Ok(())
     }
 
-    fn render_line(
+    fn render_flat(
         &mut self,
         mb: &mut MeshBuilder,
+        player: &Player,
         x: i16,
         y1: f32,
         y2: f32,
-        texture: &str,
+        texture_name: &str,
+        world_height: f32,
         light_level: i16,
+        graphic: &Graphic,
     ) -> Result<()> {
         if y1 > y2 {
             return Ok(());
         }
-        let clipped_y1 = y1.clamp(0.0, self.height);
-        let clipped_y2 = (y2 + 1.0).clamp(0.0, self.height);
-        let points = [
-            glam::vec2(self.offset.x + x as f32, self.offset.y + clipped_y1),
-            glam::vec2(self.offset.x + x as f32, self.offset.y + clipped_y2),
-        ];
-        let color = self.get_wall_color(texture, light_level);
-        mb.line(&points, 1.0, color)?;
+        if texture_name == "F_SKY1" {
+            self.render_sky_flat(
+                mb,
+                player.angle,
+                x,
+                y1,
+                y2,
+                &graphic.flats[texture_name],
+                graphic,
+            )?;
+        } else {
+            self.render_flat_texture(
+                mb,
+                player,
+                x,
+                y1,
+                y2,
+                &graphic.flats[texture_name],
+                world_height,
+                light_level,
+                graphic,
+            )?;
+        }
         Ok(())
     }
 
-    fn get_wall_color(&mut self, texture: &str, light_level: i16) -> Color {
-        let key = format!("{texture}{light_level}");
-        if let Some(color) = self.color_map.get(&key) {
-            return *color;
+    fn render_sky_flat(
+        &mut self,
+        mb: &mut MeshBuilder,
+        player_angle: f32,
+        x: i16,
+        y1: f32,
+        y2: f32,
+        palettes: &[usize],
+        graphic: &Graphic,
+    ) -> Result<()> {
+        let clipped_y1 = y1.clamp(0.0, self.height) as usize;
+        let clipped_y2 = (y2 + 1.0).clamp(0.0, self.height) as usize;
+        let texture_column = (2.2 * (player_angle + self.fov_x_to_angle(x))) as usize;
+        let texture_x = texture_column.rem_euclid(FLAT_SIZE);
+        // TODO
+        let inverse_scale = 160.0 / self.height;
+        let mut texture_y = 100.0 + (clipped_y1 as f32 - self.half_height) * inverse_scale;
+        for y in clipped_y1..clipped_y2 + 1 {
+            let idx = (texture_y as usize % FLAT_SIZE) * FLAT_SIZE + texture_x;
+            let pallete_idx = palettes[idx];
+            let rgb = graphic.palettes[0][pallete_idx];
+            let color = Color::from_rgb(rgb.0, rgb.1, rgb.2);
+            let offset_x = self.offset.x + x as f32;
+            let offset_y = self.offset.y + y as f32;
+            mb.circle(
+                DrawMode::Fill(FillOptions::default()),
+                glam::vec2(offset_x, offset_y),
+                1.0,
+                0.1,
+                color,
+            )?;
+            texture_y += inverse_scale
         }
-        // keyから色を生成する
-        let mut hasher = std::collections::hash_map::DefaultHasher::new();
-        key.hash(&mut hasher);
-        let hash = hasher.finish();
-        let light = light_level as f32 / 255.0;
-        let r = ((hash & 0xFF0000) >> 16) as f32;
-        let g = ((hash & 0x00FF00) >> 8) as f32;
-        let b = (hash & 0x0000FF) as f32;
-        let base_color = Color::from_rgb((r * light) as u8, (g * light) as u8, (b * light) as u8);
-        self.color_map.insert(key, base_color);
-        base_color
+        Ok(())
+    }
+
+    fn render_flat_texture(
+        &mut self,
+        mb: &mut MeshBuilder,
+        player: &Player,
+        x: i16,
+        y1: f32,
+        y2: f32,
+        palettes: &[usize],
+        view_height: f32,
+        light_level: i16,
+        graphic: &Graphic,
+    ) -> Result<()> {
+        let dir_x = player.angle.to_radians().cos();
+        let dir_y = player.angle.to_radians().sin();
+        let clipped_y1 = y1.clamp(0.0, self.height) as usize;
+        let clipped_y2 = (y2 + 1.0).clamp(0.0, self.height) as usize;
+        for y in clipped_y1..clipped_y2 + 1 {
+            // プレイヤーが見ている距離
+            let dist = self.half_width * view_height / (self.half_height - y as f32);
+            // プレイヤーから見たワールドの点の座標
+            let world_x = dir_x * dist + player.pos.x;
+            let world_y = dir_y * dist + player.pos.y;
+            // 視界の左端と右端のワールドの点の座標
+            let left_x = -dir_y * dist + world_x;
+            let left_y = dir_x * dist + world_y;
+            let right_x = dir_y * dist + world_x;
+            let right_y = -dir_x * dist + world_y;
+            // 現在の点からテクスチャのどこを描画するかを決める
+            let dx = (right_x - left_x) / self.width;
+            let dy = (right_y - left_y) / self.width;
+            let texture_x = (left_x + dx * x as f32).rem_euclid(FLAT_SIZE as f32) as usize;
+            let texture_y = (left_y + dy * x as f32).rem_euclid(FLAT_SIZE as f32) as usize;
+            let pallete_idx = palettes[texture_y * FLAT_SIZE + texture_x];
+            // TODO: light_levelから適切な色を取得する
+            let rgb = graphic.palettes[0][pallete_idx];
+            let color = Color::from_rgb(rgb.0, rgb.1, rgb.2);
+            let offset_x = self.offset.x + x as f32;
+            let offset_y = self.offset.y + y as f32;
+            mb.circle(
+                DrawMode::Fill(FillOptions::default()),
+                glam::vec2(offset_x, offset_y),
+                1.0,
+                0.1,
+                color,
+            )?;
+        }
+        Ok(())
     }
 }
