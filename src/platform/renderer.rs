@@ -774,13 +774,13 @@ impl ViewRenderer {
             return Ok(());
         }
         if texture_name == "F_SKY1" {
-            self.render_sky_flat(
+            self.render_sky_texture(
                 mb,
                 player.angle,
                 x,
                 y1,
                 y2,
-                &graphic.flats[texture_name],
+                &graphic.textures["SKY1"],
                 graphic,
             )?;
         } else {
@@ -799,37 +799,39 @@ impl ViewRenderer {
         Ok(())
     }
 
-    fn render_sky_flat(
+    fn render_sky_texture(
         &mut self,
         mb: &mut MeshBuilder,
         player_angle: f32,
         x: i16,
         y1: f32,
         y2: f32,
-        palettes: &[usize],
+        texture: &Texture,
         graphic: &Graphic,
     ) -> Result<()> {
         let clipped_y1 = y1.clamp(0.0, self.height) as usize;
         let clipped_y2 = (y2 + 1.0).clamp(0.0, self.height) as usize;
-        let texture_column = (2.2 * (player_angle + self.fov_x_to_angle(x))) as usize;
-        let texture_x = texture_column.rem_euclid(FLAT_SIZE);
-        // TODO
+        // 4つの空の画像を360度に対応させる
+        let normal = (4.0 * (player_angle + self.fov_x_to_angle(x))).rem_euclid(360.0) / 360.0;
+        let texture_x = (normal * texture.width as f32) as usize;
         let inverse_scale = 160.0 / self.height;
         let mut texture_y = 100.0 + (clipped_y1 as f32 - self.half_height) * inverse_scale;
         for y in clipped_y1..clipped_y2 + 1 {
-            let idx = (texture_y as usize % FLAT_SIZE) * FLAT_SIZE + texture_x;
-            let pallete_idx = palettes[idx];
-            let rgb = graphic.palettes[0][pallete_idx];
-            let color = Color::from_rgb(rgb.0, rgb.1, rgb.2);
-            let offset_x = self.offset.x + x as f32;
-            let offset_y = self.offset.y + y as f32;
-            mb.circle(
-                DrawMode::Fill(FillOptions::default()),
-                glam::vec2(offset_x, offset_y),
-                1.0,
-                0.1,
-                color,
-            )?;
+            let tex_y = texture_y.rem_euclid(texture.height as f32) as usize;
+            let idx = tex_y * texture.width + texture_x;
+            if let Some(pallete_idx) = texture.palettes[idx] {
+                let rgb = graphic.palettes[0][pallete_idx];
+                let color = Color::from_rgb(rgb.0, rgb.1, rgb.2);
+                let offset_x = self.offset.x + x as f32;
+                let offset_y = self.offset.y + y as f32;
+                mb.circle(
+                    DrawMode::Fill(FillOptions::default()),
+                    glam::vec2(offset_x, offset_y),
+                    1.0,
+                    0.1,
+                    color,
+                )?;
+            }
             texture_y += inverse_scale
         }
         Ok(())
