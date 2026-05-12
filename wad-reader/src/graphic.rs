@@ -6,6 +6,7 @@ use anyhow::Result;
 use std::collections::HashMap;
 
 pub const FLAT_SIZE: usize = 64;
+pub const SKY_ID: &str = "F_SKY1";
 
 pub struct Graphic {
     pub palettes: Vec<Vec<(u8, u8, u8)>>,

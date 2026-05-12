@@ -10,7 +10,7 @@ use ggez::{
     glam,
     graphics::{Color, DrawMode, FillOptions, MeshBuilder, Rect},
 };
-use wad_reader::graphic::{FLAT_SIZE, Graphic, Texture};
+use wad_reader::graphic::{FLAT_SIZE, Graphic, SKY_ID, Texture};
 use wad_reader::map::{Map, Position, Seg, SubSector};
 
 pub const WIDTH: f32 = 1280.0;
@@ -374,7 +374,7 @@ impl ViewRenderer {
         let ceiling_height = sector.ceiling_height as f32 - player.view_height;
         let floor_height = sector.floor_height as f32 - player.view_height;
         // 描画判定
-        let is_render_ceiling = ceiling_height > 0.0;
+        let is_render_ceiling = ceiling_height > 0.0 || sector.ceiling_texture_name == SKY_ID;
         let is_render_wall = sidedef.middle_texture_name != "-";
         let is_render_floor = floor_height < 0.0;
 
@@ -494,11 +494,20 @@ impl ViewRenderer {
         let front_floor_height = front_sector.floor_height as f32 - player.view_height;
         let back_ceiling_height = back_sector.ceiling_height as f32 - player.view_height;
         let back_floor_height = back_sector.floor_height as f32 - player.view_height;
+        // 空のportalなら後ろの天井の高さ
+        let is_sky_portal = front_sector.ceiling_texture_name == back_sector.ceiling_texture_name
+            && front_sector.ceiling_texture_name == SKY_ID;
+        let front_ceiling_height = if is_sky_portal {
+            back_ceiling_height
+        } else {
+            front_ceiling_height
+        };
 
         let ceiling_condition = front_ceiling_height != back_ceiling_height
             || front_sector.ceiling_texture_name != back_sector.ceiling_texture_name
             || front_sector.light_level != back_sector.light_level;
-        let is_render_ceiling = ceiling_condition && front_ceiling_height >= 0.0;
+        let is_render_ceiling = ceiling_condition
+            && (front_ceiling_height >= 0.0 || front_sector.ceiling_texture_name == SKY_ID);
         // 手前の天井が高い場合はupper wallを描画する
         let is_render_upper_wall = ceiling_condition
             && upper_wall_texture != "-"
@@ -771,7 +780,7 @@ impl ViewRenderer {
         if y1 > y2 {
             return Ok(());
         }
-        if texture_name == "F_SKY1" {
+        if texture_name == SKY_ID {
             self.render_sky_texture(
                 mb,
                 player.angle,
