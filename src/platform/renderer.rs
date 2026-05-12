@@ -44,7 +44,7 @@ impl Renderer {
         self.map_renderer
             .render_insight_subsector(mb, &doom.player, &doom.map, Color::YELLOW)?;
         self.view_renderer
-            .render(&mut self.pixel_buf, &self.graphic, &doom.map, &doom.player)?;
+            .render(&mut self.pixel_buf, &self.graphic, &doom.map, &doom.player);
         Ok(())
     }
 
@@ -233,15 +233,14 @@ impl ViewRenderer {
         graphic: &Graphic,
         map: &Map,
         player: &Player,
-    ) -> Result<()> {
+    ) {
         self.solid_seg.initialize();
         self.upper_clip.fill(-1.0);
         self.lower_clip.fill(self.height - 1.0);
         // プレイヤーから見えるサブセクターを描画する
         for idx in get_subsector_indices(map, player) {
-            self.render_subsector(pixel_buf, graphic, &map.subsectors[idx], map, player)?;
+            self.render_subsector(pixel_buf, graphic, &map.subsectors[idx], map, player);
         }
-        Ok(())
     }
 
     pub fn render_subsector(
@@ -251,12 +250,11 @@ impl ViewRenderer {
         sub_sector: &SubSector,
         map: &Map,
         player: &Player,
-    ) -> Result<()> {
+    ) {
         for i in 0..sub_sector.seg_count {
             let seg = &map.segs[(sub_sector.seg_idx + i) as usize];
-            self.render_seg(pixel_buf, graphic, seg, map, player)?;
+            self.render_seg(pixel_buf, graphic, seg, map, player);
         }
-        Ok(())
     }
 
     pub fn render_seg(
@@ -266,7 +264,7 @@ impl ViewRenderer {
         seg: &wad_reader::map::Seg,
         map: &Map,
         player: &Player,
-    ) -> Result<()> {
+    ) {
         let start = Vector2::new(
             map.vertexes[seg.start as usize].x as f32,
             map.vertexes[seg.start as usize].y as f32,
@@ -286,12 +284,12 @@ impl ViewRenderer {
                 );
                 let ranges = self.solid_seg.get_renderable_ranges(fov_x);
                 for range in &ranges {
-                    self.render_solid_wall(pixel_buf, graphic, map, seg, player, line, *range)?;
+                    self.render_solid_wall(pixel_buf, graphic, map, seg, player, line, *range);
                 }
                 for range in ranges {
                     self.solid_seg.set_renderable_range(range);
                 }
-                return Ok(());
+                return;
             }
             let front_sector = &map.sectors[map.sidedefs[linedef.front as usize].sector as usize];
             let back_sector = &map.sectors[map.sidedefs[linedef.back as usize].sector as usize];
@@ -304,26 +302,25 @@ impl ViewRenderer {
                     self.angle_to_fov_x(end_angle),
                 );
                 for range in self.solid_seg.get_renderable_ranges(fov_x) {
-                    self.render_portal_wall(pixel_buf, graphic, map, seg, player, line, range)?;
+                    self.render_portal_wall(pixel_buf, graphic, map, seg, player, line, range);
                 }
-                return Ok(());
+                return;
             }
             if back_sector.ceiling_texture_name == front_sector.ceiling_texture_name
                 && back_sector.floor_texture_name == front_sector.floor_texture_name
                 && back_sector.light_level == front_sector.light_level
                 && map.sidedefs[linedef.front as usize].upper_texture_name == "-"
             {
-                return Ok(());
+                return;
             }
             let fov_x = (
                 self.angle_to_fov_x(start_angle),
                 self.angle_to_fov_x(end_angle),
             );
             for range in self.solid_seg.get_renderable_ranges(fov_x) {
-                self.render_portal_wall(pixel_buf, graphic, map, seg, player, line, range)?;
+                self.render_portal_wall(pixel_buf, graphic, map, seg, player, line, range);
             }
         }
-        Ok(())
     }
 
     fn calc_scale(&self, fov_x: i16, normal_angle: f32, dist: f32, player_angle: f32) -> f32 {
@@ -364,7 +361,7 @@ impl ViewRenderer {
         player: &Player,
         line: Line,
         fov_x: (i16, i16),
-    ) -> Result<()> {
+    ) {
         let linedef = &map.linedefs[seg.line as usize];
         let sidedef = &map.sidedefs[linedef.front as usize];
         let sector = &map.sectors[sidedef.sector as usize];
@@ -427,7 +424,7 @@ impl ViewRenderer {
                     ceiling_height,
                     light_level,
                     graphic,
-                )?;
+                );
             }
             if is_render_wall {
                 // 壁の上端は壁全体の上端をクリップ、下端は壁全体の下端をクリップして描画する
@@ -450,7 +447,7 @@ impl ViewRenderer {
                     inverse_scale,
                     light_level,
                     graphic,
-                )?;
+                );
             }
             if is_render_floor {
                 // 床の上端は壁全体の下端とクリップの上端の大きい方、下端はクリップの下端
@@ -466,10 +463,9 @@ impl ViewRenderer {
                     floor_height,
                     light_level,
                     graphic,
-                )?;
+                );
             }
         }
-        Ok(())
     }
 
     fn render_portal_wall(
@@ -481,7 +477,7 @@ impl ViewRenderer {
         player: &Player,
         line: Line,
         fov_x: (i16, i16),
-    ) -> Result<()> {
+    ) {
         let linedef = &map.linedefs[seg.line as usize];
         let sidedef = &map.sidedefs[linedef.front as usize];
         let front_sector = &map.sectors[seg.front_sector as usize];
@@ -527,7 +523,7 @@ impl ViewRenderer {
         // 描画するものがない場合は何もしない
         if !is_render_ceiling && !is_render_upper_wall && !is_render_floor && !is_render_lower_wall
         {
-            return Ok(());
+            return;
         }
 
         // 線分の角度 + 90度
@@ -624,7 +620,7 @@ impl ViewRenderer {
                         front_ceiling_height,
                         light_level,
                         graphic,
-                    )?;
+                    );
                 }
                 // upper_wallの上端と下端をクリップして描画する
                 let w_y1 = upper_wall_y1.max(self.upper_clip[idx_x] + 1.0);
@@ -640,7 +636,7 @@ impl ViewRenderer {
                     inverse_scale,
                     light_level,
                     graphic,
-                )?;
+                );
                 if self.upper_clip[idx_x] < w_y2 {
                     self.upper_clip[idx_x] = w_y2
                 }
@@ -660,7 +656,7 @@ impl ViewRenderer {
                     front_ceiling_height,
                     light_level,
                     graphic,
-                )?;
+                );
                 if self.upper_clip[idx_x] < c_y2 {
                     self.upper_clip[idx_x] = c_y2
                 }
@@ -680,7 +676,7 @@ impl ViewRenderer {
                         front_floor_height,
                         light_level,
                         graphic,
-                    )?;
+                    );
                 }
                 let portal_y2 = portal_y2 + portal_y2_step * diff;
                 // lower_wallの上端はportalの下端とクリップの上端の大きい方
@@ -698,7 +694,7 @@ impl ViewRenderer {
                     inverse_scale,
                     light_level,
                     graphic,
-                )?;
+                );
                 if self.lower_clip[idx_x] > w_y1 {
                     self.lower_clip[idx_x] = w_y1
                 }
@@ -718,13 +714,12 @@ impl ViewRenderer {
                     front_floor_height,
                     light_level,
                     graphic,
-                )?;
+                );
                 if self.lower_clip[idx_x] > wall_y2 + 1.0 {
                     self.lower_clip[idx_x] = f_y1
                 }
             }
         }
-        Ok(())
     }
 
     fn render_texture(
@@ -739,9 +734,9 @@ impl ViewRenderer {
         inverse_scale: f32,
         light_level: i16,
         graphic: &Graphic,
-    ) -> Result<()> {
+    ) {
         if y1 > y2 {
-            return Ok(());
+            return;
         }
         let clipped_y1 = y1.clamp(0.0, self.height) as usize;
         let clipped_y2 = (y2 + 1.0).clamp(0.0, self.height) as usize;
@@ -757,7 +752,6 @@ impl ViewRenderer {
             }
             texture_y += inverse_scale
         }
-        Ok(())
     }
 
     fn render_flat(
@@ -771,9 +765,9 @@ impl ViewRenderer {
         world_height: f32,
         light_level: i16,
         graphic: &Graphic,
-    ) -> Result<()> {
+    ) {
         if y1 > y2 {
-            return Ok(());
+            return;
         }
         if texture_name == SKY_ID {
             self.render_sky_texture(
@@ -784,7 +778,7 @@ impl ViewRenderer {
                 y2,
                 &graphic.textures["SKY1"],
                 graphic,
-            )?;
+            );
         } else {
             self.render_flat_texture(
                 pixel_buf,
@@ -796,9 +790,8 @@ impl ViewRenderer {
                 world_height,
                 light_level,
                 graphic,
-            )?;
+            );
         }
-        Ok(())
     }
 
     fn render_sky_texture(
@@ -810,7 +803,7 @@ impl ViewRenderer {
         y2: f32,
         texture: &Texture,
         graphic: &Graphic,
-    ) -> Result<()> {
+    ) {
         let clipped_y1 = y1.clamp(0.0, self.height) as usize;
         let clipped_y2 = (y2 + 1.0).clamp(0.0, self.height) as usize;
         // 4つの空の画像を360度に対応させる
@@ -827,7 +820,6 @@ impl ViewRenderer {
             }
             texture_y += inverse_scale
         }
-        Ok(())
     }
 
     fn render_flat_texture(
@@ -841,7 +833,7 @@ impl ViewRenderer {
         view_height: f32,
         light_level: i16,
         graphic: &Graphic,
-    ) -> Result<()> {
+    ) {
         let dir_x = player.angle.to_radians().cos();
         let dir_y = player.angle.to_radians().sin();
         let clipped_y1 = y1.clamp(0.0, self.height) as usize;
@@ -867,6 +859,5 @@ impl ViewRenderer {
             let rgb = graphic.palettes[0][pallete_idx];
             pixel_buf.set_pixel(x as usize, y, rgb);
         }
-        Ok(())
     }
 }
