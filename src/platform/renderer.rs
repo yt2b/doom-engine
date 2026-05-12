@@ -1,6 +1,4 @@
 use anyhow::Result;
-use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
 
 use crate::core::bsp::get_subsector_indices;
 use crate::core::math::{Line, Vector2};
