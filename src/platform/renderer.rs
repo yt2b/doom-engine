@@ -31,7 +31,7 @@ impl Renderer {
             pixel_buf: PixelBuf::new(SCREEN_WIDTH, SCREEN_HEIGHT),
             graphic,
             map_renderer: MapRenderer::new(640.0, -280.0, 0.15),
-            view_renderer: ViewRenderer::new(320.0, 200.0, Vector2::new(20.0, 40.0), PLAYER_FOV),
+            view_renderer: ViewRenderer::new(SCREEN_WIDTH as f32, SCREEN_HEIGHT as f32, PLAYER_FOV),
         }
     }
 
@@ -196,14 +196,13 @@ struct ViewRenderer {
     height: f32,
     half_height: f32,
     screen_dist: f32,
-    offset: Vector2,
     solid_seg: SolidSeg,
     upper_clip: Vec<f32>,
     lower_clip: Vec<f32>,
 }
 
 impl ViewRenderer {
-    pub fn new(width: f32, height: f32, offset: Vector2, fov: f32) -> Self {
+    pub fn new(width: f32, height: f32, fov: f32) -> Self {
         let half_width = width / 2.0;
         let screen_dist = half_width / (fov / 2.0).to_radians().tan();
         Self {
@@ -212,7 +211,6 @@ impl ViewRenderer {
             height,
             half_height: height / 2.0,
             screen_dist,
-            offset,
             solid_seg: SolidSeg::new(width as i16),
             upper_clip: vec![-1.0; width as usize],
             lower_clip: vec![height - 1.0; width as usize],
