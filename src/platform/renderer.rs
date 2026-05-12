@@ -5,18 +5,21 @@ use crate::core::math::{Line, Vector2};
 use crate::core::player::PLAYER_FOV;
 use crate::core::solidseg::SolidSeg;
 use crate::core::{doom::Doom, player::Player};
-use ggez::graphics::StrokeOptions;
+use crate::platform::pixel_buf::PixelBuf;
 use ggez::{
     glam,
-    graphics::{Color, DrawMode, FillOptions, MeshBuilder, Rect},
+    graphics::{Color, DrawMode, FillOptions, MeshBuilder},
 };
 use wad_reader::graphic::{FLAT_SIZE, Graphic, SKY_ID, Texture};
 use wad_reader::map::{Map, Position, Seg, SubSector};
 
 pub const WIDTH: f32 = 1280.0;
 pub const HEIGHT: f32 = 800.0;
+pub const SCREEN_WIDTH: usize = 320;
+pub const SCREEN_HEIGHT: usize = 200;
 
 pub struct Renderer {
+    pixel_buf: PixelBuf,
     graphic: Graphic,
     map_renderer: MapRenderer,
     view_renderer: ViewRenderer,
@@ -25,6 +28,7 @@ pub struct Renderer {
 impl Renderer {
     pub fn new(graphic: Graphic) -> Self {
         Self {
+            pixel_buf: PixelBuf::new(SCREEN_WIDTH, SCREEN_HEIGHT),
             graphic,
             map_renderer: MapRenderer::new(640.0, -280.0, 0.15),
             view_renderer: ViewRenderer::new(320.0, 200.0, Vector2::new(20.0, 40.0), PLAYER_FOV),
@@ -32,6 +36,7 @@ impl Renderer {
     }
 
     pub fn draw(&mut self, mb: &mut MeshBuilder, doom: &Doom) -> Result<()> {
+        self.pixel_buf.clear();
         self.map_renderer
             .render_map(mb, &doom.map, Color::from_rgb(64, 64, 64))?;
         self.map_renderer
@@ -39,8 +44,12 @@ impl Renderer {
         self.map_renderer
             .render_insight_subsector(mb, &doom.player, &doom.map, Color::YELLOW)?;
         self.view_renderer
-            .render(mb, &self.graphic, &doom.map, &doom.player)?;
+            .render(&mut self.pixel_buf, &self.graphic, &doom.map, &doom.player)?;
         Ok(())
+    }
+
+    pub fn get_pixel_buf(&self) -> &[u8] {
+        &self.pixel_buf.buf
     }
 }
 
@@ -206,7 +215,7 @@ impl ViewRenderer {
             offset,
             solid_seg: SolidSeg::new(width as i16),
             upper_clip: vec![-1.0; width as usize],
-            lower_clip: vec![height; width as usize],
+            lower_clip: vec![height - 1.0; width as usize],
         }
     }
 
@@ -222,27 +231,24 @@ impl ViewRenderer {
 
     pub fn render(
         &mut self,
-        mb: &mut MeshBuilder,
+        pixel_buf: &mut PixelBuf,
         graphic: &Graphic,
         map: &Map,
         player: &Player,
     ) -> Result<()> {
         self.solid_seg.initialize();
         self.upper_clip.fill(-1.0);
-        self.lower_clip.fill(self.height);
+        self.lower_clip.fill(self.height - 1.0);
         // プレイヤーから見えるサブセクターを描画する
         for idx in get_subsector_indices(map, player) {
-            self.render_subsector(mb, graphic, &map.subsectors[idx], map, player)?;
+            self.render_subsector(pixel_buf, graphic, &map.subsectors[idx], map, player)?;
         }
-        let bounds = Rect::new(self.offset.x, self.offset.y, self.width, self.height);
-        let mode = DrawMode::Stroke(StrokeOptions::default());
-        mb.rectangle(mode, bounds, Color::WHITE)?;
         Ok(())
     }
 
     pub fn render_subsector(
         &mut self,
-        mb: &mut MeshBuilder,
+        pixel_buf: &mut PixelBuf,
         graphic: &Graphic,
         sub_sector: &SubSector,
         map: &Map,
@@ -250,14 +256,14 @@ impl ViewRenderer {
     ) -> Result<()> {
         for i in 0..sub_sector.seg_count {
             let seg = &map.segs[(sub_sector.seg_idx + i) as usize];
-            self.render_seg(mb, graphic, seg, map, player)?;
+            self.render_seg(pixel_buf, graphic, seg, map, player)?;
         }
         Ok(())
     }
 
     pub fn render_seg(
         &mut self,
-        mb: &mut MeshBuilder,
+        pixel_buf: &mut PixelBuf,
         graphic: &Graphic,
         seg: &wad_reader::map::Seg,
         map: &Map,
@@ -282,7 +288,7 @@ impl ViewRenderer {
                 );
                 let ranges = self.solid_seg.get_renderable_ranges(fov_x);
                 for range in &ranges {
-                    self.render_solid_wall(mb, graphic, map, seg, player, line, *range)?;
+                    self.render_solid_wall(pixel_buf, graphic, map, seg, player, line, *range)?;
                 }
                 for range in ranges {
                     self.solid_seg.set_renderable_range(range);
@@ -300,7 +306,7 @@ impl ViewRenderer {
                     self.angle_to_fov_x(end_angle),
                 );
                 for range in self.solid_seg.get_renderable_ranges(fov_x) {
-                    self.render_portal_wall(mb, graphic, map, seg, player, line, range)?;
+                    self.render_portal_wall(pixel_buf, graphic, map, seg, player, line, range)?;
                 }
                 return Ok(());
             }
@@ -316,7 +322,7 @@ impl ViewRenderer {
                 self.angle_to_fov_x(end_angle),
             );
             for range in self.solid_seg.get_renderable_ranges(fov_x) {
-                self.render_portal_wall(mb, graphic, map, seg, player, line, range)?;
+                self.render_portal_wall(pixel_buf, graphic, map, seg, player, line, range)?;
             }
         }
         Ok(())
@@ -353,7 +359,7 @@ impl ViewRenderer {
 
     pub fn render_solid_wall(
         &mut self,
-        mb: &mut MeshBuilder,
+        pixel_buf: &mut PixelBuf,
         graphic: &Graphic,
         map: &Map,
         seg: &Seg,
@@ -414,7 +420,7 @@ impl ViewRenderer {
                 let c_y1 = self.upper_clip[idx_x] + 1.0;
                 let c_y2 = (y1 - 1.0).min(self.lower_clip[idx_x] - 1.0);
                 self.render_flat(
-                    mb,
+                    pixel_buf,
                     player,
                     x,
                     c_y1,
@@ -436,7 +442,7 @@ impl ViewRenderer {
                 // 倍率の逆数をかけてテクスチャの大きさを補正する
                 let inverse_scale = 1.0 / (scale1 + scale_step * diff);
                 self.render_texture(
-                    mb,
+                    pixel_buf,
                     x,
                     w_y1,
                     w_y2,
@@ -453,7 +459,7 @@ impl ViewRenderer {
                 let f_y1 = (y2 + 1.0).max(self.upper_clip[idx_x] + 1.0);
                 let f_y2 = self.lower_clip[idx_x] - 1.0;
                 self.render_flat(
-                    mb,
+                    pixel_buf,
                     player,
                     x,
                     f_y1,
@@ -470,7 +476,7 @@ impl ViewRenderer {
 
     fn render_portal_wall(
         &mut self,
-        mb: &mut MeshBuilder,
+        pixel_buf: &mut PixelBuf,
         graphic: &Graphic,
         map: &Map,
         seg: &Seg,
@@ -611,7 +617,7 @@ impl ViewRenderer {
                     let c_y1 = self.upper_clip[idx_x] + 1.0;
                     let c_y2 = (wall_y1 - 1.0).min(self.lower_clip[idx_x] - 1.0);
                     self.render_flat(
-                        mb,
+                        pixel_buf,
                         player,
                         x,
                         c_y1,
@@ -626,7 +632,7 @@ impl ViewRenderer {
                 let w_y1 = upper_wall_y1.max(self.upper_clip[idx_x] + 1.0);
                 let w_y2 = upper_wall_y2.min(self.lower_clip[idx_x] - 1.0);
                 self.render_texture(
-                    mb,
+                    pixel_buf,
                     x,
                     w_y1,
                     w_y2,
@@ -647,7 +653,7 @@ impl ViewRenderer {
                 // 天井の下端は壁全体の上端とクリップの下端の小さい方
                 let c_y2 = (wall_y1 - 1.0).min(self.lower_clip[idx_x] - 1.0);
                 self.render_flat(
-                    mb,
+                    pixel_buf,
                     player,
                     x,
                     c_y1,
@@ -667,7 +673,7 @@ impl ViewRenderer {
                     let f_y1 = (wall_y2 + 1.0).max(self.upper_clip[idx_x] + 1.0);
                     let f_y2 = self.lower_clip[idx_x] - 1.0;
                     self.render_flat(
-                        mb,
+                        pixel_buf,
                         player,
                         x,
                         f_y1,
@@ -684,7 +690,7 @@ impl ViewRenderer {
                 // lower_wallの下端は壁全体の下端とクリップの下端の小さい方
                 let w_y2 = wall_y2.min(self.lower_clip[idx_x] - 1.0);
                 self.render_texture(
-                    mb,
+                    pixel_buf,
                     x,
                     w_y1,
                     w_y2,
@@ -705,7 +711,7 @@ impl ViewRenderer {
                 // 床の下端はクリップの下端
                 let f_y2 = self.lower_clip[idx_x] - 1.0;
                 self.render_flat(
-                    mb,
+                    pixel_buf,
                     player,
                     x,
                     f_y1,
@@ -725,7 +731,7 @@ impl ViewRenderer {
 
     fn render_texture(
         &mut self,
-        mb: &mut MeshBuilder,
+        pixel_buf: &mut PixelBuf,
         x: i16,
         y1: f32,
         y2: f32,
@@ -749,16 +755,7 @@ impl ViewRenderer {
             if let Some(palette_idx) = texture.palettes[idx] {
                 // TODO: light_levelから適切な色を取得する
                 let rgb = graphic.palettes[0][palette_idx];
-                let color = Color::from_rgb(rgb.0, rgb.1, rgb.2);
-                let offset_x = self.offset.x + x as f32;
-                let offset_y = self.offset.y + y as f32;
-                mb.circle(
-                    DrawMode::Fill(FillOptions::default()),
-                    glam::vec2(offset_x, offset_y),
-                    1.0,
-                    0.1,
-                    color,
-                )?;
+                pixel_buf.set_pixel(x as usize, y, rgb);
             }
             texture_y += inverse_scale
         }
@@ -767,7 +764,7 @@ impl ViewRenderer {
 
     fn render_flat(
         &mut self,
-        mb: &mut MeshBuilder,
+        pixel_buf: &mut PixelBuf,
         player: &Player,
         x: i16,
         y1: f32,
@@ -782,7 +779,7 @@ impl ViewRenderer {
         }
         if texture_name == SKY_ID {
             self.render_sky_texture(
-                mb,
+                pixel_buf,
                 player.angle,
                 x,
                 y1,
@@ -792,7 +789,7 @@ impl ViewRenderer {
             )?;
         } else {
             self.render_flat_texture(
-                mb,
+                pixel_buf,
                 player,
                 x,
                 y1,
@@ -808,7 +805,7 @@ impl ViewRenderer {
 
     fn render_sky_texture(
         &mut self,
-        mb: &mut MeshBuilder,
+        pixel_buf: &mut PixelBuf,
         player_angle: f32,
         x: i16,
         y1: f32,
@@ -828,16 +825,7 @@ impl ViewRenderer {
             let idx = tex_y * texture.width + texture_x;
             if let Some(pallete_idx) = texture.palettes[idx] {
                 let rgb = graphic.palettes[0][pallete_idx];
-                let color = Color::from_rgb(rgb.0, rgb.1, rgb.2);
-                let offset_x = self.offset.x + x as f32;
-                let offset_y = self.offset.y + y as f32;
-                mb.circle(
-                    DrawMode::Fill(FillOptions::default()),
-                    glam::vec2(offset_x, offset_y),
-                    1.0,
-                    0.1,
-                    color,
-                )?;
+                pixel_buf.set_pixel(x as usize, y, rgb);
             }
             texture_y += inverse_scale
         }
@@ -846,7 +834,7 @@ impl ViewRenderer {
 
     fn render_flat_texture(
         &mut self,
-        mb: &mut MeshBuilder,
+        pixel_buf: &mut PixelBuf,
         player: &Player,
         x: i16,
         y1: f32,
@@ -879,16 +867,7 @@ impl ViewRenderer {
             let pallete_idx = palettes[texture_y * FLAT_SIZE + texture_x];
             // TODO: light_levelから適切な色を取得する
             let rgb = graphic.palettes[0][pallete_idx];
-            let color = Color::from_rgb(rgb.0, rgb.1, rgb.2);
-            let offset_x = self.offset.x + x as f32;
-            let offset_y = self.offset.y + y as f32;
-            mb.circle(
-                DrawMode::Fill(FillOptions::default()),
-                glam::vec2(offset_x, offset_y),
-                1.0,
-                0.1,
-                color,
-            )?;
+            pixel_buf.set_pixel(x as usize, y, rgb);
         }
         Ok(())
     }

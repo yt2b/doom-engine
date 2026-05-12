@@ -1,6 +1,7 @@
 use crate::core::doom::Doom;
-use crate::platform::renderer::{HEIGHT, Renderer, WIDTH};
+use crate::platform::renderer::{HEIGHT, Renderer, SCREEN_HEIGHT, SCREEN_WIDTH, WIDTH};
 use anyhow::Result;
+use ggez::graphics::{Image, ImageFormat};
 use ggez::{
     Context, GameResult,
     conf::{WindowMode, WindowSetup},
@@ -57,8 +58,21 @@ impl EventHandler for Game {
         self.renderer
             .draw(&mut mb, &self.doom)
             .map_err(|e| ggez::GameError::CustomError(e.to_string()))?;
-        let mesh = Mesh::from_data(ctx, mb.build());
         let mut canvas = graphics::Canvas::from_frame(ctx, graphics::Color::BLACK);
+        let image = Image::from_pixels(
+            ctx,
+            &self.renderer.get_pixel_buf(),
+            ImageFormat::Rgba8UnormSrgb,
+            SCREEN_WIDTH as u32,
+            SCREEN_HEIGHT as u32,
+        );
+        canvas.draw(
+            &image,
+            graphics::DrawParam::default()
+                .dest([100.0, 300.0])
+                .scale([1.5, 1.5]),
+        );
+        let mesh = Mesh::from_data(ctx, mb.build());
         canvas.draw(&mesh, graphics::DrawParam::default());
         canvas.finish(ctx)
     }
