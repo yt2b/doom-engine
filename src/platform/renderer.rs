@@ -738,13 +738,14 @@ impl ViewRenderer {
         if y1 > y2 {
             return;
         }
+        let color_idx = ((255 - light_level) / 16) as usize;
         let texture_x = texture_column.rem_euclid(texture.width as i16) as usize;
         let mut texture_y = texture_y_offset + (y1 as f32 - self.half_height) * inverse_scale;
         for y in y1 as usize..(y2 + 1.0) as usize {
             let idx = (texture_y as usize % texture.height) * texture.width + texture_x;
             if let Some(palette_idx) = texture.palettes[idx] {
-                // TODO: light_levelから適切な色を取得する
-                let rgb = graphic.palettes[0][palette_idx];
+                let mapped_idx = graphic.colormaps[color_idx][palette_idx];
+                let rgb = graphic.palettes[0][mapped_idx];
                 pixel_buf.set_pixel(x as usize, y, rgb);
             }
             texture_y += inverse_scale
@@ -829,6 +830,7 @@ impl ViewRenderer {
         light_level: i16,
         graphic: &Graphic,
     ) {
+        let color_idx = ((255 - light_level) / 16) as usize;
         let dir_x = player.angle.to_radians().cos();
         let dir_y = player.angle.to_radians().sin();
         for y in y1 as usize..(y2 + 1.0) as usize {
@@ -847,9 +849,9 @@ impl ViewRenderer {
             let dy = (right_y - left_y) / self.width;
             let texture_x = (left_x + dx * x as f32).rem_euclid(FLAT_SIZE as f32) as usize;
             let texture_y = (left_y + dy * x as f32).rem_euclid(FLAT_SIZE as f32) as usize;
-            let pallete_idx = palettes[texture_y * FLAT_SIZE + texture_x];
-            // TODO: light_levelから適切な色を取得する
-            let rgb = graphic.palettes[0][pallete_idx];
+            let palette_idx = palettes[texture_y * FLAT_SIZE + texture_x];
+            let mapped_idx = graphic.colormaps[color_idx][palette_idx];
+            let rgb = graphic.palettes[0][mapped_idx];
             pixel_buf.set_pixel(x as usize, y, rgb);
         }
     }
