@@ -738,12 +738,9 @@ impl ViewRenderer {
         if y1 > y2 {
             return;
         }
-        let clipped_y1 = y1.clamp(0.0, self.height) as usize;
-        let clipped_y2 = (y2 + 1.0).clamp(0.0, self.height) as usize;
         let texture_x = texture_column.rem_euclid(texture.width as i16) as usize;
-        let mut texture_y =
-            texture_y_offset + (clipped_y1 as f32 - self.half_height) * inverse_scale;
-        for y in clipped_y1..clipped_y2 + 1 {
+        let mut texture_y = texture_y_offset + (y1 as f32 - self.half_height) * inverse_scale;
+        for y in y1 as usize..(y2 + 1.0) as usize {
             let idx = (texture_y as usize % texture.height) * texture.width + texture_x;
             if let Some(palette_idx) = texture.palettes[idx] {
                 // TODO: light_levelから適切な色を取得する
@@ -804,14 +801,12 @@ impl ViewRenderer {
         texture: &Texture,
         graphic: &Graphic,
     ) {
-        let clipped_y1 = y1.clamp(0.0, self.height) as usize;
-        let clipped_y2 = (y2 + 1.0).clamp(0.0, self.height) as usize;
         // 4つの空の画像を360度に対応させる
         let normal = (4.0 * (player_angle + self.fov_x_to_angle(x))).rem_euclid(360.0) / 360.0;
         let texture_x = (normal * texture.width as f32) as usize;
         let inverse_scale = 160.0 / self.height;
-        let mut texture_y = 100.0 + (clipped_y1 as f32 - self.half_height) * inverse_scale;
-        for y in clipped_y1..clipped_y2 + 1 {
+        let mut texture_y = 100.0 + (y1 - self.half_height) * inverse_scale;
+        for y in y1 as usize..(y2 + 1.0) as usize {
             let tex_y = texture_y.rem_euclid(texture.height as f32) as usize;
             let idx = tex_y * texture.width + texture_x;
             if let Some(pallete_idx) = texture.palettes[idx] {
@@ -836,9 +831,7 @@ impl ViewRenderer {
     ) {
         let dir_x = player.angle.to_radians().cos();
         let dir_y = player.angle.to_radians().sin();
-        let clipped_y1 = y1.clamp(0.0, self.height) as usize;
-        let clipped_y2 = (y2 + 1.0).clamp(0.0, self.height) as usize;
-        for y in clipped_y1..clipped_y2 + 1 {
+        for y in y1 as usize..(y2 + 1.0) as usize {
             // プレイヤーが見ている距離
             let dist = self.half_width * view_height / (self.half_height - y as f32);
             // プレイヤーから見たワールドの点の座標
