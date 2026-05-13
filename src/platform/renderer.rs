@@ -213,7 +213,7 @@ impl ViewRenderer {
             screen_dist,
             solid_seg: SolidSeg::new(width as i16),
             upper_clip: vec![-1.0; width as usize],
-            lower_clip: vec![height - 1.0; width as usize],
+            lower_clip: vec![height; width as usize],
         }
     }
 
@@ -236,7 +236,7 @@ impl ViewRenderer {
     ) {
         self.solid_seg.initialize();
         self.upper_clip.fill(-1.0);
-        self.lower_clip.fill(self.height - 1.0);
+        self.lower_clip.fill(self.height);
         // プレイヤーから見えるサブセクターを描画する
         for idx in get_subsector_indices(map, player) {
             self.render_subsector(pixel_buf, graphic, &map.subsectors[idx], map, player);
