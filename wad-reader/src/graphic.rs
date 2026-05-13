@@ -10,6 +10,7 @@ pub const SKY_ID: &str = "F_SKY1";
 
 pub struct Graphic {
     pub palettes: Vec<Vec<(u8, u8, u8)>>,
+    pub colormaps: Vec<Vec<usize>>,
     pub sprites: HashMap<String, Patch>,
     pub patch_names: Vec<String>,
     pub texture_patches: HashMap<String, Patch>,
@@ -22,6 +23,13 @@ impl Graphic {
         // パレットを読み込む
         let lump = wad.get_lump("PLAYPAL")?;
         let palettes = get_palettes(&lump.bytes);
+        // カラーマップを読み込む
+        let lump = wad.get_lump("COLORMAP")?;
+        let colormaps = lump
+            .bytes
+            .chunks(256)
+            .map(|chunk| chunk.iter().map(|&idx| idx as usize).collect())
+            .collect::<Vec<Vec<usize>>>();
         // スプライトを読み込む
         let start_idx = wad.get_lump_index("S_START")?;
         let end_idx = wad.get_lump_index("S_END")?;
@@ -67,6 +75,7 @@ impl Graphic {
         }
         Ok(Self {
             palettes,
+            colormaps,
             sprites,
             patch_names,
             texture_patches,
