@@ -418,8 +418,8 @@ impl ViewRenderer {
                     pixel_buf,
                     player,
                     x,
-                    c_y1,
-                    c_y2,
+                    c_y1 as usize,
+                    c_y2 as usize,
                     ceiling_texture,
                     ceiling_height,
                     light_level,
@@ -439,8 +439,8 @@ impl ViewRenderer {
                 self.render_texture(
                     pixel_buf,
                     x,
-                    w_y1,
-                    w_y2,
+                    w_y1 as usize,
+                    w_y2 as usize,
                     texture,
                     texture_column,
                     texture_y_offset,
@@ -457,8 +457,8 @@ impl ViewRenderer {
                     pixel_buf,
                     player,
                     x,
-                    f_y1,
-                    f_y2,
+                    f_y1 as usize,
+                    f_y2 as usize,
                     floor_texture,
                     floor_height,
                     light_level,
@@ -614,8 +614,8 @@ impl ViewRenderer {
                         pixel_buf,
                         player,
                         x,
-                        c_y1,
-                        c_y2,
+                        c_y1 as usize,
+                        c_y2 as usize,
                         ceiling_texture,
                         front_ceiling_height,
                         light_level,
@@ -628,8 +628,8 @@ impl ViewRenderer {
                 self.render_texture(
                     pixel_buf,
                     x,
-                    w_y1,
-                    w_y2,
+                    w_y1 as usize,
+                    w_y2 as usize,
                     &graphic.textures[upper_wall_texture],
                     texture_column,
                     upper_wall_offset,
@@ -650,8 +650,8 @@ impl ViewRenderer {
                     pixel_buf,
                     player,
                     x,
-                    c_y1,
-                    c_y2,
+                    c_y1 as usize,
+                    c_y2 as usize,
                     ceiling_texture,
                     front_ceiling_height,
                     light_level,
@@ -670,8 +670,8 @@ impl ViewRenderer {
                         pixel_buf,
                         player,
                         x,
-                        f_y1,
-                        f_y2,
+                        f_y1 as usize,
+                        f_y2 as usize,
                         floor_texture,
                         front_floor_height,
                         light_level,
@@ -686,8 +686,8 @@ impl ViewRenderer {
                 self.render_texture(
                     pixel_buf,
                     x,
-                    w_y1,
-                    w_y2,
+                    w_y1 as usize,
+                    w_y2 as usize,
                     &graphic.textures[lower_wall_texture],
                     texture_column,
                     lower_wall_offset,
@@ -708,8 +708,8 @@ impl ViewRenderer {
                     pixel_buf,
                     player,
                     x,
-                    f_y1,
-                    f_y2,
+                    f_y1 as usize,
+                    f_y2 as usize,
                     floor_texture,
                     front_floor_height,
                     light_level,
@@ -726,8 +726,8 @@ impl ViewRenderer {
         &mut self,
         pixel_buf: &mut PixelBuf,
         x: i16,
-        y1: f32,
-        y2: f32,
+        y1: usize,
+        y2: usize,
         texture: &Texture,
         texture_column: i16,
         texture_y_offset: f32,
@@ -741,7 +741,7 @@ impl ViewRenderer {
         let color_idx = ((255 - light_level) / 16) as usize;
         let texture_x = texture_column.rem_euclid(texture.width as i16) as usize;
         let mut texture_y = texture_y_offset + (y1 as f32 - self.half_height) * inverse_scale;
-        for y in y1 as usize..(y2 + 1.0) as usize {
+        for y in y1..y2 + 1 {
             let idx = (texture_y as usize % texture.height) * texture.width + texture_x;
             if let Some(palette_idx) = texture.palettes[idx] {
                 let mapped_idx = graphic.colormaps[color_idx][palette_idx];
@@ -757,8 +757,8 @@ impl ViewRenderer {
         pixel_buf: &mut PixelBuf,
         player: &Player,
         x: i16,
-        y1: f32,
-        y2: f32,
+        y1: usize,
+        y2: usize,
         texture_name: &str,
         world_height: f32,
         light_level: i16,
@@ -797,8 +797,8 @@ impl ViewRenderer {
         pixel_buf: &mut PixelBuf,
         player_angle: f32,
         x: i16,
-        y1: f32,
-        y2: f32,
+        y1: usize,
+        y2: usize,
         texture: &Texture,
         graphic: &Graphic,
     ) {
@@ -806,8 +806,8 @@ impl ViewRenderer {
         let normal = (4.0 * (player_angle + self.fov_x_to_angle(x))).rem_euclid(360.0) / 360.0;
         let texture_x = (normal * texture.width as f32) as usize;
         let inverse_scale = 160.0 / self.height;
-        let mut texture_y = 100.0 + (y1 - self.half_height) * inverse_scale;
-        for y in y1 as usize..(y2 + 1.0) as usize {
+        let mut texture_y = 100.0 + (y1 as f32 - self.half_height) * inverse_scale;
+        for y in y1..y2 + 1 {
             let tex_y = texture_y.rem_euclid(texture.height as f32) as usize;
             let idx = tex_y * texture.width + texture_x;
             if let Some(pallete_idx) = texture.palettes[idx] {
@@ -823,8 +823,8 @@ impl ViewRenderer {
         pixel_buf: &mut PixelBuf,
         player: &Player,
         x: i16,
-        y1: f32,
-        y2: f32,
+        y1: usize,
+        y2: usize,
         palettes: &[usize],
         view_height: f32,
         light_level: i16,
@@ -833,7 +833,7 @@ impl ViewRenderer {
         let color_idx = ((255 - light_level) / 16) as usize;
         let dir_x = player.angle.to_radians().cos();
         let dir_y = player.angle.to_radians().sin();
-        for y in y1 as usize..(y2 + 1.0) as usize {
+        for y in y1..y2 + 1 {
             // プレイヤーが見ている距離
             let dist = self.half_width * view_height / (self.half_height - y as f32);
             // プレイヤーから見たワールドの点の座標
