@@ -1,5 +1,6 @@
 use crate::core::doom::Doom;
 use crate::core::renderer::Renderer;
+use crate::core::renderer::graphic::Graphic;
 use crate::platform::renderer::{HEIGHT, MapRenderer, WIDTH};
 use anyhow::Result;
 use ggez::graphics::{Image, ImageFormat};
@@ -29,7 +30,7 @@ impl Game {
     }
 
     fn new(doom: Doom) -> Result<Self> {
-        let graphic = doom.wad.read_graphic()?;
+        let graphic = Graphic::new_from_wad(&doom.wad)?;
         Ok(Self {
             doom,
             renderer: Renderer::new(graphic),

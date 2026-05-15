@@ -1,9 +1,10 @@
 use crate::core::doom::Doom;
 use crate::core::player::PLAYER_FOV;
+use crate::core::renderer::graphic::Graphic;
 use crate::core::renderer::pixel_buf::PixelBuf;
 use crate::core::renderer::view::ViewRenderer;
-use wad_reader::graphic::Graphic;
 
+pub mod graphic;
 pub mod pixel_buf;
 pub mod view;
 

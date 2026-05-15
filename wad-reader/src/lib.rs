@@ -1,14 +1,13 @@
+use crate::map::Map;
 use crate::read::{read_i32, read_string};
-use crate::{graphic::Graphic, map::Map};
 use anyhow::Result;
 use std::{
     fs::File,
     io::{BufReader, Read},
 };
 
-pub mod graphic;
 pub mod map;
-mod read;
+pub mod read;
 
 pub struct Wad {
     pub ident: String,
@@ -38,14 +37,14 @@ impl Wad {
         Ok(Self { ident, lumps })
     }
 
-    fn get_lump(&self, name: &str) -> Result<&Lump> {
+    pub fn get_lump(&self, name: &str) -> Result<&Lump> {
         self.lumps
             .iter()
             .find(|lump| lump.name == name)
             .ok_or_else(|| anyhow::anyhow!("Lump named '{}' not found", name))
     }
 
-    fn get_lump_index(&self, name: &str) -> Result<usize> {
+    pub fn get_lump_index(&self, name: &str) -> Result<usize> {
         self.lumps
             .iter()
             .position(|lump| lump.name == name)
@@ -56,10 +55,6 @@ impl Wad {
         let start_index = self.get_lump_index(name)?;
         let map_lumps = &self.lumps[start_index..];
         Map::new_from_lumps(map_lumps)
-    }
-
-    pub fn read_graphic(&self) -> Result<Graphic> {
-        Graphic::new_from_wad(self)
     }
 }
 

@@ -1,9 +1,7 @@
-use crate::{
-    Wad,
-    read::{read_i16, read_i32, read_string, read_u16, read_u32},
-};
 use anyhow::Result;
 use std::collections::HashMap;
+use wad_reader::Wad;
+use wad_reader::read::{read_i16, read_i32, read_string, read_u16, read_u32};
 
 pub const FLAT_SIZE: usize = 64;
 pub const SKY_ID: &str = "F_SKY1";

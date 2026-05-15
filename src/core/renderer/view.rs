@@ -1,9 +1,9 @@
 use crate::core::bsp::get_subsector_indices;
 use crate::core::math::{Line, Vector2};
 use crate::core::player::Player;
+use crate::core::renderer::graphic::{FLAT_SIZE, Graphic, SKY_ID, Texture};
 use crate::core::renderer::pixel_buf::PixelBuf;
 use crate::core::solidseg::SolidSeg;
-use wad_reader::graphic::{FLAT_SIZE, Graphic, SKY_ID, Texture};
 use wad_reader::map::{Map, Seg, SubSector};
 
 pub struct ViewRenderer {
