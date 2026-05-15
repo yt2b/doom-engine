@@ -48,8 +48,8 @@ impl Renderer {
         Ok(())
     }
 
-    pub fn get_pixel_buf(&self) -> &[u8] {
-        &self.pixel_buf.buf
+    pub fn get_pixel_buf(&self) -> &PixelBuf {
+        &self.pixel_buf
     }
 }
 
