@@ -393,10 +393,8 @@ impl ViewRenderer {
         let wall_y1_step = -scale_step * ceiling_height;
         let wall_y2 = (self.height / 2.0) - floor_height * scale1;
         let wall_y2_step = -scale_step * floor_height;
-        // 垂線との交点から端点までの距離 ※「sin(offset_angle) = opposite / hypotenuse」の変形
-        let opposite = hypotenuse * offset_angle.to_radians().sin();
-        // oppositeにテクスチャのオフセットを足したものが、テクスチャのどこを描画するかの基準になる
-        let texture_offset = opposite + (seg.offset_dist + sidedef.offset_x) as f32;
+        let texture_x_offset =
+            get_texture_x_offset(hypotenuse, offset_angle, seg.offset_dist, sidedef.offset_x);
         // 壁の法線と視線の角度差
         let center_angle = normal_angle - player.angle;
         let texture_y_offset = if linedef.flags & 0x10 > 0 {
@@ -433,7 +431,7 @@ impl ViewRenderer {
                 // 角度差からテクスチャのどこを描画するかを決める
                 let angle = center_angle - self.fov_x_to_angle(x);
                 let texture_column =
-                    (normal_dist * angle.to_radians().tan() - texture_offset) as i16;
+                    (normal_dist * angle.to_radians().tan() - texture_x_offset) as i16;
                 // 倍率の逆数をかけてテクスチャの大きさを補正する
                 let inverse_scale = 1.0 / (scale1 + scale_step * diff);
                 self.render_texture(
@@ -557,10 +555,8 @@ impl ViewRenderer {
         } else {
             back_floor_height
         } + sidedef.offset_y as f32;
-        // 垂線との交点から端点までの距離 ※「sin(offset_angle) = opposite / hypotenuse」の変形
-        let opposite = hypotenuse * offset_angle.to_radians().sin();
-        // oppositeにテクスチャのオフセットを足したものが、テクスチャのどこを描画するかの基準になる
-        let texture_offset = opposite + (seg.offset_dist + sidedef.offset_x) as f32;
+        let texture_x_offset =
+            get_texture_x_offset(hypotenuse, offset_angle, seg.offset_dist, sidedef.offset_x);
         // 壁の法線と視線の角度差
         let center_angle = normal_angle - player.angle;
 
@@ -596,7 +592,7 @@ impl ViewRenderer {
             let wall_y2 = wall_y2 + wall_y2_step * diff;
             // 角度差からテクスチャのどこを描画するかを決める
             let angle = center_angle - self.fov_x_to_angle(x);
-            let texture_column = (normal_dist * angle.to_radians().tan() - texture_offset) as i16;
+            let texture_column = (normal_dist * angle.to_radians().tan() - texture_x_offset) as i16;
             // 倍率の逆数をかけてテクスチャの大きさを補正する
             let inverse_scale = 1.0 / (scale1 + scale_step * diff);
 
@@ -855,4 +851,16 @@ impl ViewRenderer {
             pixel_buf.set_pixel(x as usize, y, rgb);
         }
     }
+}
+
+fn get_texture_x_offset(
+    hypotenuse: f32,
+    offset_angle: f32,
+    seg_offset_dist: i16,
+    sidedef_offset_x: i16,
+) -> f32 {
+    // 法線との交点から端点までの距離 ※「sin(offset_angle) = opposite / hypotenuse」の変形
+    let opposite = hypotenuse * offset_angle.to_radians().sin();
+    // oppositeにテクスチャのオフセットを引いたものが、テクスチャのどこを描画するかの基準になる
+    opposite - (seg_offset_dist + sidedef_offset_x) as f32
 }
