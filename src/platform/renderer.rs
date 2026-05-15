@@ -341,7 +341,7 @@ impl ViewRenderer {
         player_angle: f32,
         fov_x: (i16, i16),
     ) -> (f32, f32) {
-        // (視界のx座標、線分の角度 + 90度、法線の距離、プレイヤーの角度）から倍率を求める
+        // (視界のx座標、壁の法線の角度、法線の距離、プレイヤーの角度）から倍率を求める
         let scale1 = self.calc_scale(fov_x.0, normal_angle, normal_dist, player_angle);
         let scale2 = self.calc_scale(fov_x.1, normal_angle, normal_dist, player_angle);
         let scale_step = if (fov_x.1 - fov_x.0) > 0 {
@@ -379,11 +379,11 @@ impl ViewRenderer {
         let is_render_wall = sidedef.middle_texture_name != "-";
         let is_render_floor = floor_height < 0.0;
 
-        // 線分の角度 + 90度
+        // 壁の法線の角度
         let normal_angle = seg.angle + 90.0;
-        // 線分の角度 + 90度　- 壁の端点の角度 ※法線の距離を求めるのに使う
+        // 壁の法線の角度 - 壁の始点の角度
         let offset_angle = normal_angle - (line.start - player.pos).angle();
-        // プレイヤーと点の距離
+        // プレイヤーと壁の始点の距離
         let hypotenuse = line.start.dist(&player.pos);
         // 壁の法線距離 ※「cos(offset_angle) = normal_dist / hypotenuse」の変形
         let normal_dist = hypotenuse * offset_angle.to_radians().cos();
@@ -524,11 +524,11 @@ impl ViewRenderer {
             return;
         }
 
-        // 線分の角度 + 90度
+        // 壁の法線の角度
         let normal_angle = seg.angle + 90.0;
-        // 線分の角度 + 90度　- 壁の端点の角度 ※法線の距離を求めるのに使う
+        // 壁の法線の角度 - 壁の始点の角度
         let offset_angle = normal_angle - (line.start - player.pos).angle();
-        // プレイヤーと点の距離
+        // プレイヤーと壁の始点の距離
         let hypotenuse = line.start.dist(&player.pos);
         // 壁の法線距離 ※「cos(offset_angle) = normal_dist / hypotenuse」の変形
         let normal_dist = hypotenuse * offset_angle.to_radians().cos();
