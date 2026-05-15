@@ -398,7 +398,7 @@ impl ViewRenderer {
         // 壁の法線と視線の角度差
         let center_angle = normal_angle - player.angle;
         let texture_y_offset = if linedef.flags & 0x10 > 0 {
-            floor_height + texture.width as f32
+            floor_height + texture.height as f32
         } else {
             ceiling_height
         } + sidedef.offset_y as f32;
