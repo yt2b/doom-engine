@@ -864,3 +864,19 @@ fn calc_texture_x_offset(
     // oppositeにテクスチャのオフセットを引いたものが、テクスチャのどこを描画するかの基準になる
     opposite - (seg_offset_dist + sidedef_offset_x) as f32
 }
+
+#[cfg(test)]
+mod tests {
+    use super::calc_texture_x_offset;
+
+    #[test]
+    fn test_get_texture_x_offset() {
+        assert_eq!(calc_texture_x_offset(5.0, 0.0, 0, 0), 0.0);
+        assert_eq!(calc_texture_x_offset(5.0, 0.0, 10, 0), -10.0);
+        assert_eq!(calc_texture_x_offset(5.0, 0.0, 10, 10), -20.0);
+        assert_eq!(calc_texture_x_offset(10.0, 30.0, 0, 0), 5.0);
+        assert_eq!(calc_texture_x_offset(10.0, 30.0, 10, 10), -15.0);
+        assert_eq!(calc_texture_x_offset(10.0, -30.0, 0, 0), -5.0);
+        assert_eq!(calc_texture_x_offset(10.0, -30.0, 10, 10), -25.0);
+    }
+}
