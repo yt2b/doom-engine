@@ -588,7 +588,7 @@ impl ViewRenderer {
         for x in fov_x.0..(fov_x.1 + 1) {
             let idx_x = x as usize;
             let diff = (x - fov_x.0) as f32;
-            let wall_y1 = wall_y1 - 1.0 + wall_y1_step * diff;
+            let wall_y1 = wall_y1 + wall_y1_step * diff;
             let wall_y2 = wall_y2 + wall_y2_step * diff;
             // 角度差からテクスチャのどこを描画するかを決める
             let angle = center_angle - self.fov_x_to_angle(x);
@@ -599,7 +599,7 @@ impl ViewRenderer {
             if is_render_upper_wall {
                 let portal_y1 = portal_y1 + portal_y1_step * diff;
                 // upper_wallの上端は壁全体の上端
-                let upper_wall_y1 = wall_y1 - 1.0;
+                let upper_wall_y1 = wall_y1;
                 // upper_wallの下端はportalの上端
                 let upper_wall_y2 = portal_y1;
                 if is_render_ceiling {
