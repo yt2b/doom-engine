@@ -394,7 +394,7 @@ impl ViewRenderer {
         let wall_y2 = (self.height / 2.0) - floor_height * scale1;
         let wall_y2_step = -scale_step * floor_height;
         let texture_x_offset =
-            get_texture_x_offset(hypotenuse, offset_angle, seg.offset_dist, sidedef.offset_x);
+            calc_texture_x_offset(hypotenuse, offset_angle, seg.offset_dist, sidedef.offset_x);
         // 壁の法線と視線の角度差
         let center_angle = normal_angle - player.angle;
         let texture_y_offset = if linedef.flags & 0x10 > 0 {
@@ -556,7 +556,7 @@ impl ViewRenderer {
             back_floor_height
         } + sidedef.offset_y as f32;
         let texture_x_offset =
-            get_texture_x_offset(hypotenuse, offset_angle, seg.offset_dist, sidedef.offset_x);
+            calc_texture_x_offset(hypotenuse, offset_angle, seg.offset_dist, sidedef.offset_x);
         // 壁の法線と視線の角度差
         let center_angle = normal_angle - player.angle;
 
@@ -853,7 +853,7 @@ impl ViewRenderer {
     }
 }
 
-fn get_texture_x_offset(
+fn calc_texture_x_offset(
     hypotenuse: f32,
     offset_angle: f32,
     seg_offset_dist: i16,
