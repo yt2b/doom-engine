@@ -1,5 +1,6 @@
 use crate::core::doom::Doom;
-use crate::platform::renderer::{HEIGHT, Renderer, WIDTH};
+use crate::core::renderer::Renderer;
+use crate::platform::renderer::{HEIGHT, MapRenderer, WIDTH};
 use anyhow::Result;
 use ggez::graphics::{Image, ImageFormat};
 use ggez::{
@@ -13,6 +14,7 @@ use ggez::{
 pub struct Game {
     doom: Doom,
     renderer: Renderer,
+    map_renderer: MapRenderer,
 }
 
 impl Game {
@@ -31,6 +33,7 @@ impl Game {
         Ok(Self {
             doom,
             renderer: Renderer::new(graphic),
+            map_renderer: MapRenderer::new(640.0, -280.0, 0.15),
         })
     }
 }
@@ -54,10 +57,7 @@ impl EventHandler for Game {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
-        let mut mb = graphics::MeshBuilder::new();
-        self.renderer
-            .draw(&mut mb, &self.doom)
-            .map_err(|e| ggez::GameError::CustomError(e.to_string()))?;
+        self.renderer.draw(&self.doom);
         let pixel_buf = self.renderer.get_pixel_buf();
         let image = Image::from_pixels(
             ctx,
@@ -73,6 +73,10 @@ impl EventHandler for Game {
                 .dest([100.0, 300.0])
                 .scale([1.5, 1.5]),
         );
+        let mut mb = graphics::MeshBuilder::new();
+        self.map_renderer
+            .render(&mut mb, &self.doom)
+            .map_err(|e| ggez::GameError::CustomError(e.to_string()))?;
         let mesh = Mesh::from_data(ctx, mb.build());
         canvas.draw(&mesh, graphics::DrawParam::default());
         canvas.finish(ctx)
