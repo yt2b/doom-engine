@@ -292,7 +292,6 @@ impl ViewRenderer {
         fov_x: (i16, i16),
     ) {
         let linedef = &map.linedefs[seg.line as usize];
-        let sidedef = &map.sidedefs[linedef.front as usize];
         let front_sector = &map.sectors[seg.front_sector as usize];
         let back_sector = &map.sectors[seg.back_sector as usize];
         let front_sidedef = &map.sidedefs[linedef.front as usize];
@@ -361,7 +360,7 @@ impl ViewRenderer {
             } else {
                 let upper_wall_texture = &graphic.textures[upper_wall_texture];
                 back_ceiling_height + upper_wall_texture.height as f32
-            }) + sidedef.offset_y as f32
+            }) + front_sidedef.offset_y as f32
         } else {
             0.0
         };
@@ -369,9 +368,13 @@ impl ViewRenderer {
             front_ceiling_height
         } else {
             back_floor_height
-        } + sidedef.offset_y as f32;
-        let texture_x_offset =
-            calc_texture_x_offset(hypotenuse, offset_angle, seg.offset_dist, sidedef.offset_x);
+        } + front_sidedef.offset_y as f32;
+        let texture_x_offset = calc_texture_x_offset(
+            hypotenuse,
+            offset_angle,
+            seg.offset_dist,
+            front_sidedef.offset_x,
+        );
         // 壁の法線と視線の角度差
         let center_angle = normal_angle - player.angle;
 
