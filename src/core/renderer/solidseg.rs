@@ -57,7 +57,7 @@ impl SolidSeg {
 
 #[cfg(test)]
 mod tests {
-    use crate::core::solidseg::SolidSeg;
+    use super::SolidSeg;
 
     #[test]
     fn test_solid_seg() {

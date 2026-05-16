@@ -6,6 +6,7 @@ use crate::core::renderer::view::ViewRenderer;
 
 pub mod graphic;
 pub mod pixel_buf;
+mod solidseg;
 pub mod view;
 
 const SCREEN_WIDTH: usize = 320;
