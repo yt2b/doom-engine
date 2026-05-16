@@ -15,12 +15,16 @@ pub struct ViewRenderer {
     solid_seg: SolidSeg,
     upper_clip: Vec<f32>,
     lower_clip: Vec<f32>,
+    fov_x_to_angle: Vec<f32>,
 }
 
 impl ViewRenderer {
     pub fn new(width: f32, height: f32, fov: f32) -> Self {
         let half_width = width / 2.0;
         let screen_dist = half_width / (fov / 2.0).to_radians().tan();
+        let fov_x_to_angle = (0..(width as i16))
+            .map(|fov_x| convert_fov_x_to_angle(fov_x, half_width, screen_dist))
+            .collect();
         Self {
             width,
             half_width,
@@ -30,17 +34,12 @@ impl ViewRenderer {
             solid_seg: SolidSeg::new(width as i16),
             upper_clip: vec![-1.0; width as usize],
             lower_clip: vec![height; width as usize],
+            fov_x_to_angle,
         }
     }
 
     fn angle_to_fov_x(&self, angle: f32) -> i16 {
         (self.half_width - self.screen_dist * (angle.to_radians().tan())) as i16
-    }
-
-    fn fov_x_to_angle(&self, fov_x: i16) -> f32 {
-        // 0からwidthまでのfov_xをh_fovから-h_fovに変換
-        let x = self.half_width - fov_x as f32;
-        (x / self.half_width).atan().to_degrees()
     }
 
     pub fn render(
@@ -141,7 +140,7 @@ impl ViewRenderer {
 
     fn calc_scale(&self, fov_x: i16, normal_angle: f32, dist: f32, player_angle: f32) -> f32 {
         // 視界上の角度(0度なら正面)
-        let angle_fov = self.fov_x_to_angle(fov_x);
+        let angle_fov = self.fov_x_to_angle[fov_x as usize];
         // 視線と壁の法線との差
         let angle_b = (normal_angle - (player_angle + angle_fov)).abs();
         // 端点との距離(斜めの壁の補正をした後、視線の歪みを補正する)
@@ -245,7 +244,7 @@ impl ViewRenderer {
                 let w_y1 = y1.max(self.upper_clip[idx_x] + 1.0);
                 let w_y2 = y2.min(self.lower_clip[idx_x] - 1.0);
                 // 角度差からテクスチャのどこを描画するかを決める
-                let angle = center_angle - self.fov_x_to_angle(x);
+                let angle = center_angle - self.fov_x_to_angle[x as usize];
                 let texture_column =
                     (normal_dist * angle.to_radians().tan() - texture_x_offset) as i16;
                 // 倍率の逆数をかけてテクスチャの大きさを補正する
@@ -407,7 +406,7 @@ impl ViewRenderer {
             let wall_y1 = wall_y1 + wall_y1_step * diff;
             let wall_y2 = wall_y2 + wall_y2_step * diff;
             // 角度差からテクスチャのどこを描画するかを決める
-            let angle = center_angle - self.fov_x_to_angle(x);
+            let angle = center_angle - self.fov_x_to_angle[x as usize];
             let texture_column = (normal_dist * angle.to_radians().tan() - texture_x_offset) as i16;
             // 倍率の逆数をかけてテクスチャの大きさを補正する
             let inverse_scale = 1.0 / (scale1 + scale_step * diff);
@@ -615,7 +614,8 @@ impl ViewRenderer {
         graphic: &Graphic,
     ) {
         // 4つの空の画像を360度に対応させる
-        let normal = (4.0 * (player_angle + self.fov_x_to_angle(x))).rem_euclid(360.0) / 360.0;
+        let normal =
+            (4.0 * (player_angle + self.fov_x_to_angle[x as usize])).rem_euclid(360.0) / 360.0;
         let texture_x = (normal * texture.width as f32) as usize;
         let inverse_scale = 160.0 / self.height;
         let mut texture_y = 100.0 + (y1 as f32 - self.half_height) * inverse_scale;
@@ -669,6 +669,11 @@ impl ViewRenderer {
     }
 }
 
+fn convert_fov_x_to_angle(fov_x: i16, half_width: f32, screen_dist: f32) -> f32 {
+    let x = half_width - fov_x as f32;
+    (x / screen_dist).atan().to_degrees()
+}
+
 fn calc_texture_x_offset(
     hypotenuse: f32,
     offset_angle: f32,
@@ -683,7 +688,14 @@ fn calc_texture_x_offset(
 
 #[cfg(test)]
 mod tests {
-    use super::calc_texture_x_offset;
+    use super::{calc_texture_x_offset, convert_fov_x_to_angle};
+
+    #[test]
+    fn test_convert_fov_x_to_angle() {
+        assert_eq!(convert_fov_x_to_angle(0, 160.0, 160.0), 45.0);
+        assert_eq!(convert_fov_x_to_angle(160, 160.0, 160.0), 0.0);
+        assert_eq!(convert_fov_x_to_angle(320, 160.0, 160.0), -45.0);
+    }
 
     #[test]
     fn test_get_texture_x_offset() {
