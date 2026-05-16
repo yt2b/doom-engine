@@ -27,7 +27,7 @@ impl Renderer {
         }
     }
 
-    pub fn draw(&mut self, doom: &Doom) {
+    pub fn render(&mut self, doom: &Doom) {
         self.pixel_buf.clear();
         self.view_renderer
             .render(&mut self.pixel_buf, &self.graphic, &doom.map, &doom.player);

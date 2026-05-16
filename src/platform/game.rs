@@ -58,7 +58,7 @@ impl EventHandler for Game {
     }
 
     fn draw(&mut self, ctx: &mut Context) -> GameResult<()> {
-        self.renderer.draw(&self.doom);
+        self.renderer.render(&self.doom);
         let pixel_buf = self.renderer.get_pixel_buf();
         let image = Image::from_pixels(
             ctx,
