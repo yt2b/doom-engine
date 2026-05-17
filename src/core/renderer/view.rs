@@ -57,6 +57,9 @@ impl ViewRenderer {
         self.wall_infos.clear();
         for idx in get_subsector_indices(map, player) {
             self.render_subsector(pixel_buf, graphic, &map.subsectors[idx], map, player);
+            if self.solid_seg.is_empty() {
+                break;
+            }
         }
         // wall_infosを逆順に描画する(遠い壁から近い壁の順)
         for wall_info in self.wall_infos.iter().rev() {

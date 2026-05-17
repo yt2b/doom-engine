@@ -17,6 +17,10 @@ impl SolidSeg {
         self.range_set = (0..self.width).collect();
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.range_set.is_empty()
+    }
+
     pub fn get_renderable_ranges(&self, range: (i16, i16)) -> Vec<(i16, i16)> {
         let mut renderable_ranges: Vec<(i16, i16)> = Vec::new();
         let range_set: HashSet<i16> = (range.0..range.1 + 1).collect();
