@@ -90,13 +90,13 @@ impl ViewRenderer {
         );
         let line = Line::new(start, end);
         if let Some((start_angle, end_angle)) = player.to_fov_line_angle(line) {
+            let fov_x = (
+                self.angle_to_fov_x(start_angle),
+                self.angle_to_fov_x(end_angle),
+            );
             let linedef = &map.linedefs[seg.line as usize];
             // 後ろがない場合はsolid wallとして描画する
             if linedef.back == -1 {
-                let fov_x = (
-                    self.angle_to_fov_x(start_angle),
-                    self.angle_to_fov_x(end_angle),
-                );
                 let ranges = self.solid_seg.get_renderable_ranges(fov_x);
                 for range in &ranges {
                     self.render_solid_wall(pixel_buf, graphic, map, seg, player, line, *range);
@@ -114,10 +114,6 @@ impl ViewRenderer {
             if (front_sector.ceiling_height != back_sector.ceiling_height)
                 || (front_sector.floor_height != back_sector.floor_height)
             {
-                let fov_x = (
-                    self.angle_to_fov_x(start_angle),
-                    self.angle_to_fov_x(end_angle),
-                );
                 for range in self.solid_seg.get_renderable_ranges(fov_x) {
                     self.render_portal_wall(pixel_buf, graphic, map, seg, player, line, range);
                 }
