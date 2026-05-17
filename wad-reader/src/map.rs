@@ -47,7 +47,7 @@ impl Map {
             } else {
                 seg.sidedef = linedef.back;
                 seg.front_sector = back_sector;
-                seg.back_sector = if exists_back { front_sector } else { -1 };
+                seg.back_sector = front_sector;
             }
         }
         Ok(map)
