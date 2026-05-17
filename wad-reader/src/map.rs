@@ -35,17 +35,20 @@ impl Map {
             let linedef = &map.linedefs[seg.line as usize];
             let front_sector = map.sidedefs[linedef.front as usize].sector;
             let exists_back = linedef.flags & 0x0004 != 0;
+            let back_sidedef = if exists_back { linedef.back } else { -1 };
             let back_sector = if exists_back {
                 map.sidedefs[linedef.back as usize].sector
             } else {
                 -1
             };
             if seg.dir == 0 {
-                seg.sidedef = linedef.front;
+                seg.front_sidedef = linedef.front;
+                seg.back_sidedef = back_sidedef;
                 seg.front_sector = front_sector;
                 seg.back_sector = back_sector;
             } else {
-                seg.sidedef = linedef.back;
+                seg.front_sidedef = back_sidedef;
+                seg.back_sidedef = linedef.front;
                 seg.front_sector = back_sector;
                 seg.back_sector = front_sector;
             }
@@ -215,7 +218,8 @@ pub struct Seg {
     pub line: i16,
     pub dir: i16,
     pub offset_dist: i16,
-    pub sidedef: i16,
+    pub front_sidedef: i16,
+    pub back_sidedef: i16,
     pub front_sector: i16,
     pub back_sector: i16,
 }
@@ -233,7 +237,8 @@ impl Seg {
                     line: read_i16(data, 6)?,
                     dir: read_i16(data, 8)?,
                     offset_dist: read_i16(data, 10)?,
-                    sidedef: -1,
+                    front_sidedef: -1,
+                    back_sidedef: -1,
                     front_sector: -1,
                     back_sector: -1,
                 })
