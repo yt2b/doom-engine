@@ -21,9 +21,9 @@ impl PixelBuf {
     }
 
     pub fn set_pixel(&mut self, x: usize, y: usize, rgb: (u8, u8, u8)) {
-        let i = y * self.width * 4 + x * 4;
-        self.buf[i] = rgb.0; // r
-        self.buf[i + 1] = rgb.1; // g
-        self.buf[i + 2] = rgb.2; // b
+        let buf = &mut self.buf[y * self.width * 4 + x * 4..];
+        buf[0] = rgb.0; // r
+        buf[1] = rgb.1; // g
+        buf[2] = rgb.2; // b
     }
 }
