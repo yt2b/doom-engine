@@ -30,7 +30,7 @@ impl Map {
             nodes: Node::new_from_bytes(&lumps[7].bytes)?,
             sectors: Sector::new_from_bytes(&lumps[8].bytes)?,
         };
-        // Segのfront_sectorとback_sectorを設定する
+        // Segの表裏の情報を設定する
         for seg in &mut map.segs {
             let linedef = &map.linedefs[seg.line as usize];
             let front_sector = map.sidedefs[linedef.front as usize].sector;
@@ -41,9 +41,11 @@ impl Map {
                 -1
             };
             if seg.dir == 0 {
+                seg.sidedef = linedef.front;
                 seg.front_sector = front_sector;
                 seg.back_sector = back_sector;
             } else {
+                seg.sidedef = linedef.back;
                 seg.front_sector = back_sector;
                 seg.back_sector = if exists_back { front_sector } else { -1 };
             }
@@ -213,6 +215,7 @@ pub struct Seg {
     pub line: i16,
     pub dir: i16,
     pub offset_dist: i16,
+    pub sidedef: i16,
     pub front_sector: i16,
     pub back_sector: i16,
 }
@@ -230,6 +233,7 @@ impl Seg {
                     line: read_i16(data, 6)?,
                     dir: read_i16(data, 8)?,
                     offset_dist: read_i16(data, 10)?,
+                    sidedef: -1,
                     front_sector: -1,
                     back_sector: -1,
                 })
