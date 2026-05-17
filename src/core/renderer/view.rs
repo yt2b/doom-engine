@@ -106,8 +106,10 @@ impl ViewRenderer {
                 }
                 return;
             }
-            let front_sector = &map.sectors[map.sidedefs[linedef.front as usize].sector as usize];
-            let back_sector = &map.sectors[map.sidedefs[linedef.back as usize].sector as usize];
+            let front_sidedef = &map.sidedefs[seg.front_sidedef as usize];
+            let back_sidedef = &map.sidedefs[seg.back_sidedef as usize];
+            let front_sector = &map.sectors[front_sidedef.sector as usize];
+            let back_sector = &map.sectors[back_sidedef.sector as usize];
             // 前後の部屋の天井または床の高さが違う場合は、portal wallとして描画する
             if (front_sector.ceiling_height != back_sector.ceiling_height)
                 || (front_sector.floor_height != back_sector.floor_height)
@@ -124,7 +126,7 @@ impl ViewRenderer {
             if back_sector.ceiling_texture_name == front_sector.ceiling_texture_name
                 && back_sector.floor_texture_name == front_sector.floor_texture_name
                 && back_sector.light_level == front_sector.light_level
-                && map.sidedefs[linedef.front as usize].upper_texture_name == "-"
+                && front_sidedef.upper_texture_name == "-"
             {
                 return;
             }
@@ -178,7 +180,7 @@ impl ViewRenderer {
         fov_x: (i16, i16),
     ) {
         let linedef = &map.linedefs[seg.line as usize];
-        let sidedef = &map.sidedefs[linedef.front as usize];
+        let sidedef = &map.sidedefs[seg.front_sidedef as usize];
         let sector = &map.sectors[sidedef.sector as usize];
         // テクスチャ
         let ceiling_texture = &sector.ceiling_texture_name;
@@ -294,7 +296,7 @@ impl ViewRenderer {
         let linedef = &map.linedefs[seg.line as usize];
         let front_sector = &map.sectors[seg.front_sector as usize];
         let back_sector = &map.sectors[seg.back_sector as usize];
-        let front_sidedef = &map.sidedefs[linedef.front as usize];
+        let front_sidedef = &map.sidedefs[seg.front_sidedef as usize];
         let light_level = front_sector.light_level;
         // テクスチャ
         let upper_wall_texture = &front_sidedef.upper_texture_name;
