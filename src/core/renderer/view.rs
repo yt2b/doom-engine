@@ -663,16 +663,23 @@ impl ViewRenderer {
             return;
         }
         let color_idx = ((255 - light_level) / 16) as usize;
+        let colormap = &graphic.colormaps[color_idx];
+        let palettes = &graphic.palettes[0];
         let texture_x = texture_column.rem_euclid(texture.width as i16) as usize;
-        let mut texture_y = texture_y_offset + (y1 as f32 - self.half_height) * inverse_scale;
+        let texture_height = texture.height as f32;
+        let mut texture_y =
+            (texture_y_offset + (y1 as f32 - self.half_height) * inverse_scale) % texture_height;
         for y in y1..y2 + 1 {
-            let idx = (texture_y as usize % texture.height) * texture.width + texture_x;
+            let idx = (texture_y as usize) * texture.width + texture_x;
             if let Some(palette_idx) = texture.palettes[idx] {
-                let mapped_idx = graphic.colormaps[color_idx][palette_idx];
-                let rgb = graphic.palettes[0][mapped_idx];
+                let mapped_idx = colormap[palette_idx];
+                let rgb = palettes[mapped_idx];
                 pixel_buf.set_pixel(x as usize, y, rgb);
             }
-            texture_y += inverse_scale
+            texture_y += inverse_scale;
+            if texture_y >= texture_height {
+                texture_y -= texture_height;
+            }
         }
     }
 
@@ -726,6 +733,7 @@ impl ViewRenderer {
         texture: &Texture,
         graphic: &Graphic,
     ) {
+        let palettes = &graphic.palettes[0];
         // 4つの空の画像を360度に対応させる
         let normal =
             (4.0 * (player_angle + self.fov_x_to_angle[x as usize])).rem_euclid(360.0) / 360.0;
@@ -736,7 +744,7 @@ impl ViewRenderer {
             let tex_y = texture_y.rem_euclid(texture.height as f32) as usize;
             let idx = tex_y * texture.width + texture_x;
             if let Some(pallete_idx) = texture.palettes[idx] {
-                let rgb = graphic.palettes[0][pallete_idx];
+                let rgb = palettes[pallete_idx];
                 pixel_buf.set_pixel(x as usize, y, rgb);
             }
             texture_y += inverse_scale
@@ -756,6 +764,8 @@ impl ViewRenderer {
         graphic: &Graphic,
     ) {
         let color_idx = ((255 - light_level) / 16) as usize;
+        let colormap = &graphic.colormaps[color_idx];
+        let color_palettes = &graphic.palettes[0];
         let dir_x = player.angle.to_radians().cos();
         let dir_y = player.angle.to_radians().sin();
         for y in y1..y2 + 1 {
@@ -775,8 +785,8 @@ impl ViewRenderer {
             let texture_x = (left_x + dx * x as f32).rem_euclid(FLAT_SIZE as f32) as usize;
             let texture_y = (left_y + dy * x as f32).rem_euclid(FLAT_SIZE as f32) as usize;
             let palette_idx = palettes[texture_y * FLAT_SIZE + texture_x];
-            let mapped_idx = graphic.colormaps[color_idx][palette_idx];
-            let rgb = graphic.palettes[0][mapped_idx];
+            let mapped_idx = colormap[palette_idx];
+            let rgb = color_palettes[mapped_idx];
             pixel_buf.set_pixel(x as usize, y, rgb);
         }
     }
