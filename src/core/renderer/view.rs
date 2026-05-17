@@ -670,19 +670,15 @@ impl ViewRenderer {
         let palettes = &graphic.palettes[0];
         let texture_x = texture_column.rem_euclid(texture.width as i16) as usize;
         let texture_height = texture.height as f32;
-        let mut texture_y =
-            (texture_y_offset + (y1 as f32 - self.half_height) * inverse_scale) % texture_height;
+        let mut texture_y = texture_y_offset + (y1 as f32 - self.half_height) * inverse_scale;
         for y in y1..y2 + 1 {
-            let idx = (texture_y as usize) * texture.width + texture_x;
+            let idx = (texture_y % texture_height) as usize * texture.width + texture_x;
             if let Some(palette_idx) = texture.palettes[idx] {
                 let mapped_idx = colormap[palette_idx];
                 let rgb = palettes[mapped_idx];
                 pixel_buf.set_pixel(x as usize, y, rgb);
             }
             texture_y += inverse_scale;
-            if texture_y >= texture_height {
-                texture_y -= texture_height;
-            }
         }
     }
 
