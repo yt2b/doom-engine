@@ -179,7 +179,7 @@ impl ViewRenderer {
     }
 
     pub fn render_solid_wall(
-        &mut self,
+        &self,
         pixel_buf: &mut PixelBuf,
         graphic: &Graphic,
         map: &Map,
@@ -677,7 +677,7 @@ impl ViewRenderer {
     }
 
     fn render_flat(
-        &mut self,
+        &self,
         pixel_buf: &mut PixelBuf,
         player: &Player,
         x: i16,
@@ -717,7 +717,7 @@ impl ViewRenderer {
     }
 
     fn render_sky_texture(
-        &mut self,
+        &self,
         pixel_buf: &mut PixelBuf,
         player_angle: f32,
         x: i16,
@@ -744,7 +744,7 @@ impl ViewRenderer {
     }
 
     fn render_flat_texture(
-        &mut self,
+        &self,
         pixel_buf: &mut PixelBuf,
         player: &Player,
         x: i16,
