@@ -16,6 +16,7 @@ pub struct ViewRenderer {
     upper_clip: Vec<f32>,
     lower_clip: Vec<f32>,
     fov_x_to_angle: Vec<f32>,
+    wall_infos: Vec<WallInfo>,
 }
 
 impl ViewRenderer {
@@ -35,6 +36,7 @@ impl ViewRenderer {
             upper_clip: vec![-1.0; width as usize],
             lower_clip: vec![height; width as usize],
             fov_x_to_angle,
+            wall_infos: Vec::new(),
         }
     }
 
@@ -52,9 +54,13 @@ impl ViewRenderer {
         self.solid_seg.initialize();
         self.upper_clip.fill(-1.0);
         self.lower_clip.fill(self.height);
-        // プレイヤーから見えるサブセクターを描画する
+        self.wall_infos.clear();
         for idx in get_subsector_indices(map, player) {
             self.render_subsector(pixel_buf, graphic, &map.subsectors[idx], map, player);
+        }
+        // wall_infosを逆順に描画する(遠い壁から近い壁の順)
+        for wall_info in self.wall_infos.iter().rev() {
+            self.render_wall_info(pixel_buf, graphic, map, player, wall_info);
         }
     }
 
@@ -108,6 +114,13 @@ impl ViewRenderer {
             }
             let front_sidedef = &map.sidedefs[seg.front_sidedef as usize];
             let back_sidedef = &map.sidedefs[seg.back_sidedef as usize];
+            if (front_sidedef.middle_texture_name != "-")
+                && (back_sidedef.middle_texture_name != "-")
+            {
+                for range in self.solid_seg.get_renderable_ranges(fov_x) {
+                    self.add_wall_info(map, seg, player, line, range);
+                }
+            }
             let front_sector = &map.sectors[front_sidedef.sector as usize];
             let back_sector = &map.sectors[back_sidedef.sector as usize];
             // 前後の部屋の天井または床の高さが違う場合は、portal wallとして描画する
@@ -534,8 +547,107 @@ impl ViewRenderer {
         }
     }
 
-    fn render_texture(
+    fn add_wall_info(
         &mut self,
+        map: &Map,
+        seg: &Seg,
+        player: &Player,
+        line: Line,
+        fov_x: (i16, i16),
+    ) {
+        let sidedef = &map.sidedefs[seg.front_sidedef as usize];
+        // 壁の法線の角度
+        let normal_angle = seg.angle + 90.0;
+        // 壁の法線の角度 - 壁の始点の角度
+        let offset_angle = normal_angle - (line.start - player.pos).angle();
+        // プレイヤーと壁の始点の距離
+        let hypotenuse = line.start.dist(&player.pos);
+        // 壁の法線距離 ※「cos(offset_angle) = normal_dist / hypotenuse」の変形
+        let normal_dist = hypotenuse * offset_angle.to_radians().cos();
+        let (scale, scale_step) =
+            self.calc_line_scale(normal_angle, normal_dist, player.angle, fov_x);
+        let texture_x_offset =
+            calc_texture_x_offset(hypotenuse, offset_angle, seg.offset_dist, sidedef.offset_x);
+        // fov_x.0~fov_x.1の範囲のclipを取得する
+        let range = fov_x.0..(fov_x.1 + 1);
+        let upper_clip: Vec<f32> = range.clone().map(|x| self.upper_clip[x as usize]).collect();
+        let lower_clip: Vec<f32> = range.map(|x| self.lower_clip[x as usize]).collect();
+        let wall_info = WallInfo {
+            linedef: seg.line as usize,
+            sidedef: seg.front_sidedef as usize,
+            sector: sidedef.sector as usize,
+            fov_x,
+            scale,
+            scale_step,
+            normal_angle,
+            normal_dist,
+            texture_x_offset,
+            upper_clip,
+            lower_clip,
+        };
+        self.wall_infos.push(wall_info);
+    }
+
+    fn render_wall_info(
+        &self,
+        pixel_buf: &mut PixelBuf,
+        graphic: &Graphic,
+        map: &Map,
+        player: &Player,
+        wall_info: &WallInfo,
+    ) {
+        let linedef = &map.linedefs[wall_info.linedef];
+        let sidedef = &map.sidedefs[wall_info.sidedef];
+        let sector = &map.sectors[wall_info.sector];
+        let wall_texture = &sidedef.middle_texture_name;
+        let texture = &graphic.textures[wall_texture];
+        // プレイヤーの視点からの高さ
+        let ceiling_height = sector.ceiling_height as f32 - player.view_height;
+        let floor_height = sector.floor_height as f32 - player.view_height;
+        // 壁のy座標と変化量
+        let wall_y1 = (self.height / 2.0) - ceiling_height * wall_info.scale;
+        let wall_y1_step = -wall_info.scale_step * ceiling_height;
+        let wall_y2 = (self.height / 2.0) - floor_height * wall_info.scale;
+        let wall_y2_step = -wall_info.scale_step * floor_height;
+
+        // 壁の法線と視線の角度差
+        let center_angle = wall_info.normal_angle - player.angle;
+        let texture_y_offset = if linedef.flags & 0x10 > 0 {
+            floor_height + texture.height as f32
+        } else {
+            ceiling_height
+        } + sidedef.offset_y as f32;
+        for x in wall_info.fov_x.0..(wall_info.fov_x.1 + 1) {
+            let diff = (x - wall_info.fov_x.0) as f32;
+            let y1 = wall_y1 + wall_y1_step * diff;
+            let y2 = wall_y2 + wall_y2_step * diff;
+            // 壁の上端は壁全体の上端をクリップ、下端は壁全体の下端をクリップして描画する
+            let idx_x = x as usize - wall_info.fov_x.0 as usize;
+            let w_y1 = y1.max(wall_info.upper_clip[idx_x] + 1.0);
+            let w_y2 = y2.min(wall_info.lower_clip[idx_x] - 1.0);
+            // 角度差からテクスチャのどこを描画するかを決める
+            let angle = center_angle - self.fov_x_to_angle[x as usize];
+            let texture_column = (wall_info.normal_dist * angle.to_radians().tan()
+                - wall_info.texture_x_offset) as i16;
+            // 倍率の逆数をかけてテクスチャの大きさを補正する
+            let inverse_scale = 1.0 / (wall_info.scale + wall_info.scale_step * diff);
+            self.render_texture(
+                pixel_buf,
+                x,
+                w_y1 as usize,
+                w_y2 as usize,
+                texture,
+                texture_column,
+                texture_y_offset,
+                inverse_scale,
+                sector.light_level,
+                graphic,
+            );
+        }
+    }
+
+    fn render_texture(
+        &self,
         pixel_buf: &mut PixelBuf,
         x: i16,
         y1: usize,
@@ -668,6 +780,20 @@ impl ViewRenderer {
             pixel_buf.set_pixel(x as usize, y, rgb);
         }
     }
+}
+
+struct WallInfo {
+    linedef: usize,
+    sidedef: usize,
+    sector: usize,
+    fov_x: (i16, i16),
+    scale: f32,
+    scale_step: f32,
+    normal_angle: f32,
+    normal_dist: f32,
+    texture_x_offset: f32,
+    upper_clip: Vec<f32>,
+    lower_clip: Vec<f32>,
 }
 
 fn convert_fov_x_to_angle(fov_x: i16, half_width: f32, screen_dist: f32) -> f32 {
