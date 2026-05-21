@@ -1,13 +1,13 @@
 use anyhow::Result;
 
 use crate::core::bsp::get_subsector_indices;
+use crate::core::map::{Map, Position};
 use crate::core::math::{Line, Vector2};
 use crate::core::{doom::Doom, player::Player};
 use ggez::{
     glam,
     graphics::{Color, DrawMode, FillOptions, MeshBuilder},
 };
-use wad_reader::map::{Map, Position};
 
 pub const WIDTH: f32 = 1280.0;
 pub const HEIGHT: f32 = 800.0;

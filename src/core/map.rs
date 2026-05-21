@@ -1,7 +1,5 @@
-use crate::{
-    Lump,
-    read::{read_i16, read_string},
-};
+use crate::core::wad::Lump;
+use crate::core::wad::{read_i16, read_string};
 use anyhow::Result;
 
 #[derive(Debug)]

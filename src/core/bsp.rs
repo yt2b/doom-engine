@@ -1,5 +1,5 @@
+use crate::core::map::{Map, Node};
 use crate::core::player::Player;
-use wad_reader::map::{Map, Node};
 
 // プレイヤーがいるサブセクターの高さを取得する
 pub fn get_subsector_height(map: &Map, player: &Player) -> f32 {

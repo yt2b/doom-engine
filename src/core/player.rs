@@ -1,5 +1,5 @@
+use crate::core::map::Rect;
 use crate::core::math::{Line, Vector2};
-use wad_reader::map::Rect;
 
 pub const PLAYER_FOV: f32 = 90.0;
 const VIEW_HEIGHT: f32 = 41.0;

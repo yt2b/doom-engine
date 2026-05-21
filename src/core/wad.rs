@@ -1,13 +1,9 @@
-use crate::map::Map;
-use crate::read::{read_i32, read_string};
+use crate::core::map::Map;
 use anyhow::Result;
 use std::{
     fs::File,
     io::{BufReader, Read},
 };
-
-pub mod map;
-pub mod read;
 
 pub struct Wad {
     pub ident: String,
@@ -67,4 +63,26 @@ impl Lump {
     pub fn new(name: String, bytes: Vec<u8>) -> Self {
         Self { name, bytes }
     }
+}
+
+pub fn read_string(data: &[u8], offset: usize, length: usize) -> Result<String> {
+    Ok(String::from_utf8(data[offset..offset + length].to_vec())?
+        .trim_end_matches('\0')
+        .to_string())
+}
+
+pub fn read_i16(data: &[u8], offset: usize) -> Result<i16> {
+    Ok(i16::from_le_bytes(data[offset..offset + 2].try_into()?))
+}
+
+pub fn read_u16(data: &[u8], offset: usize) -> Result<u16> {
+    Ok(u16::from_le_bytes(data[offset..offset + 2].try_into()?))
+}
+
+pub fn read_i32(data: &[u8], offset: usize) -> Result<i32> {
+    Ok(i32::from_le_bytes(data[offset..offset + 4].try_into()?))
+}
+
+pub fn read_u32(data: &[u8], offset: usize) -> Result<u32> {
+    Ok(u32::from_le_bytes(data[offset..offset + 4].try_into()?))
 }

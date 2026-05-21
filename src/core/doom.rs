@@ -1,8 +1,8 @@
 use crate::core::bsp::get_subsector_height;
+use crate::core::map::Map;
 use crate::core::player::Player;
+use crate::core::wad::Wad;
 use anyhow::Result;
-use wad_reader::Wad;
-use wad_reader::map::Map;
 
 pub struct Doom {
     pub wad: Wad,
