@@ -13,6 +13,7 @@ pub struct Graphic {
     pub patch_names: Vec<String>,
     pub texture_patches: HashMap<String, Patch>,
     pub textures: HashMap<String, Texture>,
+    pub flat_ids: HashMap<String, usize>,
     pub flats: HashMap<String, Vec<usize>>,
 }
 
@@ -59,8 +60,9 @@ impl Graphic {
         // Flatを読み込む
         let start_idx = wad.get_lump_index("F_START")?;
         let end_idx = wad.get_lump_index("F_END")?;
+        let mut flat_ids = HashMap::new();
         let mut flats = HashMap::new();
-        for lump in &wad.lumps[start_idx + 1..end_idx] {
+        for (idx, lump) in wad.lumps[start_idx + 1..end_idx].iter().enumerate() {
             if lump.bytes.len() != FLAT_SIZE * FLAT_SIZE {
                 continue;
             }
@@ -69,6 +71,7 @@ impl Graphic {
                 .iter()
                 .map(|&idx| idx as usize)
                 .collect::<Vec<usize>>();
+            flat_ids.insert(lump.name.clone(), idx);
             flats.insert(lump.name.clone(), pallets);
         }
         Ok(Self {
@@ -78,6 +81,7 @@ impl Graphic {
             patch_names,
             texture_patches,
             textures,
+            flat_ids,
             flats,
         })
     }
