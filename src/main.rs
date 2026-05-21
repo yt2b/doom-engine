@@ -1,4 +1,7 @@
-use crate::{core::wad::Wad, platform::game::Game};
+use crate::{
+    core::{renderer::graphic::Graphic, wad::Wad},
+    platform::game::Game,
+};
 use anyhow::{Context, Result};
 use clap::Parser;
 use core::doom::Doom;
@@ -18,6 +21,7 @@ fn main() -> Result<()> {
     let file = File::open(&args.wad_path)
         .with_context(|| format!("指定したWADファイルが見つかりません。 {}", args.wad_path))?;
     let wad = Wad::new(file)?;
-    let doom = Doom::new(wad)?;
-    Game::start(doom)
+    let graphic = Graphic::new(&wad)?;
+    let doom = Doom::new(wad, &graphic)?;
+    Game::start(doom, graphic)
 }

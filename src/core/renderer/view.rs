@@ -117,8 +117,8 @@ impl ViewRenderer {
             }
             let front_sidedef = &map.sidedefs[seg.front_sidedef as usize];
             let back_sidedef = &map.sidedefs[seg.back_sidedef as usize];
-            if (front_sidedef.middle_texture_name != "-")
-                && (back_sidedef.middle_texture_name != "-")
+            if (front_sidedef.middle_texture_id.is_some())
+                && (back_sidedef.middle_texture_id.is_some())
             {
                 for range in self.solid_seg.get_renderable_ranges(fov_x) {
                     self.add_wall_info(map, seg, player, line, range);
@@ -135,10 +135,10 @@ impl ViewRenderer {
                 }
                 return;
             }
-            if back_sector.ceiling_texture_name == front_sector.ceiling_texture_name
-                && back_sector.floor_texture_name == front_sector.floor_texture_name
+            if back_sector.ceiling_flat_id == front_sector.ceiling_flat_id
+                && back_sector.floor_flat_id == front_sector.floor_flat_id
                 && back_sector.light_level == front_sector.light_level
-                && front_sidedef.upper_texture_name == "-"
+                && front_sidedef.upper_texture_id.is_none()
             {
                 return;
             }
@@ -195,17 +195,18 @@ impl ViewRenderer {
         let sidedef = &map.sidedefs[seg.front_sidedef as usize];
         let sector = &map.sectors[sidedef.sector as usize];
         // テクスチャ
-        let ceiling_texture = &sector.ceiling_texture_name;
-        let wall_texture = &sidedef.middle_texture_name;
-        let floor_texture = &sector.floor_texture_name;
+        let ceiling_texture = sector.ceiling_flat_id;
+        let wall_texture = sidedef.middle_texture_id.unwrap();
+        let floor_texture = sector.floor_flat_id;
         let light_level = sector.light_level;
-        let texture = &graphic.textures[wall_texture];
+        let texture = &graphic.wall_textures[wall_texture];
         // プレイヤーの視点からの高さ
         let ceiling_height = sector.ceiling_height as f32 - player.view_height;
         let floor_height = sector.floor_height as f32 - player.view_height;
         // 描画判定
-        let is_render_ceiling = ceiling_height > 0.0 || sector.ceiling_texture_name == SKY_ID;
-        let is_render_wall = sidedef.middle_texture_name != "-";
+        let is_render_ceiling =
+            ceiling_height > 0.0 || sector.ceiling_flat_id == graphic.sky_flat_id;
+        let is_render_wall = sidedef.middle_texture_id.is_some();
         let is_render_floor = floor_height < 0.0;
 
         // 壁の法線の角度
@@ -311,18 +312,18 @@ impl ViewRenderer {
         let front_sidedef = &map.sidedefs[seg.front_sidedef as usize];
         let light_level = front_sector.light_level;
         // テクスチャ
-        let upper_wall_texture = &front_sidedef.upper_texture_name;
-        let lower_wall_texture = &front_sidedef.lower_texture_name;
-        let ceiling_texture = &front_sector.ceiling_texture_name;
-        let floor_texture = &front_sector.floor_texture_name;
+        let upper_wall_texture = &front_sidedef.upper_texture_id;
+        let lower_wall_texture = &front_sidedef.lower_texture_id;
+        let ceiling_texture = front_sector.ceiling_flat_id;
+        let floor_texture = front_sector.floor_flat_id;
         // 高さ
         let front_ceiling_height = front_sector.ceiling_height as f32 - player.view_height;
         let front_floor_height = front_sector.floor_height as f32 - player.view_height;
         let back_ceiling_height = back_sector.ceiling_height as f32 - player.view_height;
         let back_floor_height = back_sector.floor_height as f32 - player.view_height;
         // 空のportalなら後ろの天井の高さ
-        let is_sky_portal = front_sector.ceiling_texture_name == back_sector.ceiling_texture_name
-            && front_sector.ceiling_texture_name == SKY_ID;
+        let is_sky_portal = front_sector.ceiling_flat_id == back_sector.ceiling_flat_id
+            && front_sector.ceiling_flat_id == graphic.sky_flat_id;
         let front_ceiling_height = if is_sky_portal {
             back_ceiling_height
         } else {
@@ -330,21 +331,21 @@ impl ViewRenderer {
         };
 
         let ceiling_condition = front_ceiling_height != back_ceiling_height
-            || front_sector.ceiling_texture_name != back_sector.ceiling_texture_name
+            || front_sector.ceiling_flat_id != back_sector.ceiling_flat_id
             || front_sector.light_level != back_sector.light_level;
         let is_render_ceiling = ceiling_condition
-            && (front_ceiling_height >= 0.0 || front_sector.ceiling_texture_name == SKY_ID);
+            && (front_ceiling_height >= 0.0 || front_sector.ceiling_flat_id == graphic.sky_flat_id);
         // 手前の天井が高い場合はupper wallを描画する
         let is_render_upper_wall = ceiling_condition
-            && upper_wall_texture != "-"
+            && upper_wall_texture.is_some()
             && (front_ceiling_height > back_ceiling_height);
         let floor_condition = front_floor_height != back_floor_height
-            || front_sector.floor_texture_name != back_sector.floor_texture_name
+            || front_sector.floor_flat_id != back_sector.floor_flat_id
             || front_sector.light_level != back_sector.light_level;
         let is_render_floor = floor_condition && front_floor_height < 0.0;
         // 手前の床が低い場合はlower wallを描画する
         let is_render_lower_wall = floor_condition
-            && lower_wall_texture != "-"
+            && lower_wall_texture.is_some()
             && (front_floor_height < back_floor_height);
         // 描画するものがない場合は何もしない
         if !is_render_ceiling && !is_render_upper_wall && !is_render_floor && !is_render_lower_wall
@@ -372,7 +373,7 @@ impl ViewRenderer {
             (if linedef.flags & 0x08 > 0 {
                 front_ceiling_height
             } else {
-                let upper_wall_texture = &graphic.textures[upper_wall_texture];
+                let upper_wall_texture = &graphic.wall_textures[upper_wall_texture.unwrap()];
                 back_ceiling_height + upper_wall_texture.height as f32
             }) + front_sidedef.offset_y as f32
         } else {
@@ -458,7 +459,7 @@ impl ViewRenderer {
                     x,
                     w_y1 as usize,
                     w_y2 as usize,
-                    &graphic.textures[upper_wall_texture],
+                    &graphic.wall_textures[upper_wall_texture.unwrap()],
                     texture_column,
                     upper_wall_offset,
                     inverse_scale,
@@ -516,7 +517,7 @@ impl ViewRenderer {
                     x,
                     w_y1 as usize,
                     w_y2 as usize,
-                    &graphic.textures[lower_wall_texture],
+                    &graphic.wall_textures[lower_wall_texture.unwrap()],
                     texture_column,
                     lower_wall_offset,
                     inverse_scale,
@@ -602,8 +603,8 @@ impl ViewRenderer {
         let linedef = &map.linedefs[wall_info.linedef];
         let sidedef = &map.sidedefs[wall_info.sidedef];
         let sector = &map.sectors[wall_info.sector];
-        let wall_texture = &sidedef.middle_texture_name;
-        let texture = &graphic.textures[wall_texture];
+        let wall_texture = &sidedef.middle_texture_id;
+        let texture = &graphic.wall_textures[wall_texture.unwrap()];
         // プレイヤーの視点からの高さ
         let ceiling_height = sector.ceiling_height as f32 - player.view_height;
         let floor_height = sector.floor_height as f32 - player.view_height;
@@ -689,7 +690,7 @@ impl ViewRenderer {
         x: i16,
         y1: usize,
         y2: usize,
-        texture_name: &str,
+        flat_id: usize,
         world_height: f32,
         light_level: i16,
         graphic: &Graphic,
@@ -697,14 +698,14 @@ impl ViewRenderer {
         if y1 > y2 {
             return;
         }
-        if texture_name == SKY_ID {
+        if flat_id == graphic.sky_flat_id {
             self.render_sky_texture(
                 pixel_buf,
                 player.angle,
                 x,
                 y1,
                 y2,
-                &graphic.textures["SKY1"],
+                &graphic.wall_textures[graphic.sky_wall_texture_id],
                 graphic,
             );
         } else {
@@ -714,7 +715,7 @@ impl ViewRenderer {
                 x,
                 y1,
                 y2,
-                &graphic.flats[texture_name],
+                &graphic.flats[&flat_id],
                 world_height,
                 light_level,
                 graphic,

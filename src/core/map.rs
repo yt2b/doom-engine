@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+
+use crate::core::renderer::graphic::Graphic;
 use crate::core::wad::{Lump, Wad};
 use crate::core::wad::{read_i16, read_string};
 use anyhow::Result;
@@ -16,19 +19,19 @@ pub struct Map {
 }
 
 impl Map {
-    pub fn new(wad: &Wad, name: &str) -> Result<Self> {
+    pub fn new(wad: &Wad, name: &str, graphic: &Graphic) -> Result<Self> {
         let start_index = wad.get_lump_index(name)?;
         let lumps = &wad.lumps[start_index..];
         let mut map = Self {
             name: lumps[0].name.clone(),
             things: Thing::new_from_bytes(&lumps[1].bytes)?,
             linedefs: Linedef::new_from_bytes(&lumps[2].bytes)?,
-            sidedefs: Sidedef::new_from_bytes(&lumps[3].bytes)?,
+            sidedefs: Sidedef::new_from_bytes(&lumps[3].bytes, &graphic.wall_texture_ids)?,
             vertexes: Position::new_from_bytes(&lumps[4].bytes)?,
             segs: Seg::new_from_bytes(&lumps[5].bytes)?,
             subsectors: SubSector::new_from_bytes(&lumps[6].bytes)?,
             nodes: Node::new_from_bytes(&lumps[7].bytes)?,
-            sectors: Sector::new_from_bytes(&lumps[8].bytes)?,
+            sectors: Sector::new_from_bytes(&lumps[8].bytes, &graphic.flat_ids)?,
         };
         // Segの表裏の情報を設定する
         for seg in &mut map.segs {
@@ -117,23 +120,23 @@ impl Linedef {
 pub struct Sidedef {
     pub offset_x: i16,
     pub offset_y: i16,
-    pub upper_texture_name: String,
-    pub lower_texture_name: String,
-    pub middle_texture_name: String,
+    pub upper_texture_id: Option<usize>,
+    pub lower_texture_id: Option<usize>,
+    pub middle_texture_id: Option<usize>,
     pub sector: i16,
 }
 
 impl Sidedef {
-    pub fn new_from_bytes(bytes: &[u8]) -> Result<Vec<Self>> {
+    pub fn new_from_bytes(bytes: &[u8], texture_ids: &HashMap<String, usize>) -> Result<Vec<Self>> {
         bytes
             .chunks(30)
             .map(|data| {
                 Ok(Self {
                     offset_x: read_i16(data, 0)?,
                     offset_y: read_i16(data, 2)?,
-                    upper_texture_name: read_string(data, 4, 8)?,
-                    lower_texture_name: read_string(data, 12, 8)?,
-                    middle_texture_name: read_string(data, 20, 8)?,
+                    upper_texture_id: texture_ids.get(&read_string(data, 4, 8)?).copied(),
+                    lower_texture_id: texture_ids.get(&read_string(data, 12, 8)?).copied(),
+                    middle_texture_id: texture_ids.get(&read_string(data, 20, 8)?).copied(),
                     sector: read_i16(data, 28)?,
                 })
             })
@@ -164,23 +167,23 @@ impl Position {
 pub struct Sector {
     pub floor_height: i16,
     pub ceiling_height: i16,
-    pub floor_texture_name: String,
-    pub ceiling_texture_name: String,
+    pub floor_flat_id: usize,
+    pub ceiling_flat_id: usize,
     pub light_level: i16,
     pub special_kind: i16,
     pub tag: i16,
 }
 
 impl Sector {
-    pub fn new_from_bytes(bytes: &[u8]) -> Result<Vec<Self>> {
+    pub fn new_from_bytes(bytes: &[u8], flat_ids: &HashMap<String, usize>) -> Result<Vec<Self>> {
         bytes
             .chunks(26)
             .map(|data| {
                 Ok(Self {
                     floor_height: read_i16(data, 0)?,
                     ceiling_height: read_i16(data, 2)?,
-                    floor_texture_name: read_string(data, 4, 8)?,
-                    ceiling_texture_name: read_string(data, 12, 8)?,
+                    floor_flat_id: flat_ids[&read_string(data, 4, 8)?],
+                    ceiling_flat_id: flat_ids[&read_string(data, 12, 8)?],
                     light_level: read_i16(data, 20)?,
                     special_kind: read_i16(data, 22)?,
                     tag: read_i16(data, 24)?,

@@ -1,6 +1,7 @@
 use crate::core::bsp::get_subsector_height;
 use crate::core::map::Map;
 use crate::core::player::Player;
+use crate::core::renderer::graphic::Graphic;
 use crate::core::wad::Wad;
 use anyhow::Result;
 
@@ -11,8 +12,8 @@ pub struct Doom {
 }
 
 impl Doom {
-    pub fn new(wad: Wad) -> Result<Self> {
-        let map = Map::new(&wad, "E1M1")?;
+    pub fn new(wad: Wad, graphic: &Graphic) -> Result<Self> {
+        let map = Map::new(&wad, "E1M1", graphic)?;
         let thing = &map.things[0];
         let player = Player::new(thing.x as f32, thing.y as f32, thing.angle as f32);
         Ok(Self { wad, map, player })

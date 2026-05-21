@@ -12,9 +12,12 @@ pub struct Graphic {
     pub sprites: HashMap<String, Patch>,
     pub patch_names: Vec<String>,
     pub texture_patches: HashMap<String, Patch>,
-    pub textures: HashMap<String, Texture>,
+    pub wall_texture_ids: HashMap<String, usize>,
+    pub wall_textures: Vec<Texture>,
+    pub sky_wall_texture_id: usize,
     pub flat_ids: HashMap<String, usize>,
-    pub flats: HashMap<String, Vec<usize>>,
+    pub flats: HashMap<usize, Vec<usize>>,
+    pub sky_flat_id: usize,
 }
 
 impl Graphic {
@@ -52,11 +55,16 @@ impl Graphic {
             }
         }
         // テクスチャを読み込む
-        let mut textures = create_textures(wad, "TEXTURE1", &patch_names, &texture_patches)?;
+        let (mut wall_texture_ids, mut wall_textures) =
+            create_textures(wad, "TEXTURE1", &patch_names, &texture_patches, 0)?;
         if wad.get_lump("TEXTURE2").is_ok() {
-            let textures2 = create_textures(wad, "TEXTURE2", &patch_names, &texture_patches)?;
-            textures.extend(textures2);
+            let offfset_idx = wall_texture_ids.len();
+            let (wall_texture_ids2, wall_textures2) =
+                create_textures(wad, "TEXTURE2", &patch_names, &texture_patches, offfset_idx)?;
+            wall_texture_ids.extend(wall_texture_ids2);
+            wall_textures.extend(wall_textures2);
         }
+        let sky_wall_texture_id = wall_texture_ids["SKY1"];
         // Flatを読み込む
         let start_idx = wad.get_lump_index("F_START")?;
         let end_idx = wad.get_lump_index("F_END")?;
@@ -72,17 +80,22 @@ impl Graphic {
                 .map(|&idx| idx as usize)
                 .collect::<Vec<usize>>();
             flat_ids.insert(lump.name.clone(), idx);
-            flats.insert(lump.name.clone(), pallets);
+            flats.insert(idx, pallets);
         }
+        println!("{} {}", flat_ids.len(), flats.len());
+        let sky_flat_id = flat_ids[SKY_ID];
         Ok(Self {
             palettes,
             colormaps,
             sprites,
             patch_names,
             texture_patches,
-            textures,
+            wall_texture_ids,
+            wall_textures,
+            sky_wall_texture_id,
             flat_ids,
             flats,
+            sky_flat_id,
         })
     }
 }
@@ -160,15 +173,17 @@ fn create_textures(
     name: &str,
     patch_names: &[String],
     pathches: &HashMap<String, Patch>,
-) -> Result<HashMap<String, Texture>> {
+    offset_idx: usize,
+) -> Result<(HashMap<String, usize>, Vec<Texture>)> {
     let texture = wad.get_lump(name)?;
     let num_textures = read_i32(&texture.bytes, 0)? as usize;
     let offsets = (0..num_textures)
         .map(|i| read_i32(&texture.bytes, 4 + i * 4))
         .collect::<Result<Vec<i32>>>()?;
-    let mut textures = HashMap::new();
-    for offset in offsets {
-        let texture_offset = offset as usize;
+    let mut wall_texture_ids = HashMap::new();
+    let mut wall_textures = Vec::new();
+    for (idx, offset) in offsets.iter().enumerate() {
+        let texture_offset = *offset as usize;
         let name = read_string(&texture.bytes, texture_offset, 8)?;
         let width = read_u16(&texture.bytes, texture_offset + 12)? as usize;
         let height = read_u16(&texture.bytes, texture_offset + 14)? as usize;
@@ -192,9 +207,10 @@ fn create_textures(
                 }
             }
         }
-        textures.insert(name, Texture::new(width, height, palettes));
+        wall_texture_ids.insert(name.clone(), idx + offset_idx);
+        wall_textures.push(Texture::new(width, height, palettes));
     }
-    Ok(textures)
+    Ok((wall_texture_ids, wall_textures))
 }
 
 pub struct Texture {
