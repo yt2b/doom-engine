@@ -16,7 +16,7 @@ pub struct Graphic {
     pub wall_textures: Vec<Texture>,
     pub sky_wall_texture_id: usize,
     pub flat_ids: HashMap<String, usize>,
-    pub flats: HashMap<usize, Vec<usize>>,
+    pub flats: Vec<Vec<usize>>,
     pub sky_flat_id: usize,
 }
 
@@ -69,8 +69,9 @@ impl Graphic {
         let start_idx = wad.get_lump_index("F_START")?;
         let end_idx = wad.get_lump_index("F_END")?;
         let mut flat_ids = HashMap::new();
-        let mut flats = HashMap::new();
-        for (idx, lump) in wad.lumps[start_idx + 1..end_idx].iter().enumerate() {
+        let mut flats = Vec::new();
+        let mut idx = 0;
+        for lump in &wad.lumps[start_idx + 1..end_idx] {
             if lump.bytes.len() != FLAT_SIZE * FLAT_SIZE {
                 continue;
             }
@@ -80,9 +81,9 @@ impl Graphic {
                 .map(|&idx| idx as usize)
                 .collect::<Vec<usize>>();
             flat_ids.insert(lump.name.clone(), idx);
-            flats.insert(idx, pallets);
+            flats.push(pallets);
+            idx += 1;
         }
-        println!("{} {}", flat_ids.len(), flats.len());
         let sky_flat_id = flat_ids[SKY_ID];
         Ok(Self {
             palettes,

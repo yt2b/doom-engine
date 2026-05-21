@@ -712,7 +712,7 @@ impl ViewRenderer {
                 x,
                 y1,
                 y2,
-                &graphic.flats[&flat_id],
+                &graphic.flats[flat_id],
                 world_height,
                 light_level,
                 graphic,
