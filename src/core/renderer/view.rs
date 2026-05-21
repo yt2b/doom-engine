@@ -195,11 +195,8 @@ impl ViewRenderer {
         let sidedef = &map.sidedefs[seg.front_sidedef as usize];
         let sector = &map.sectors[sidedef.sector as usize];
         // テクスチャ
-        let ceiling_texture = sector.ceiling_flat_id;
-        let wall_texture = sidedef.middle_texture_id.unwrap();
-        let floor_texture = sector.floor_flat_id;
+        let texture = &graphic.wall_textures[sidedef.middle_texture_id.unwrap()];
         let light_level = sector.light_level;
-        let texture = &graphic.wall_textures[wall_texture];
         // プレイヤーの視点からの高さ
         let ceiling_height = sector.ceiling_height as f32 - player.view_height;
         let floor_height = sector.floor_height as f32 - player.view_height;
@@ -248,7 +245,7 @@ impl ViewRenderer {
                     x,
                     c_y1 as usize,
                     c_y2 as usize,
-                    ceiling_texture,
+                    sector.ceiling_flat_id,
                     ceiling_height,
                     light_level,
                     graphic,
@@ -287,7 +284,7 @@ impl ViewRenderer {
                     x,
                     f_y1 as usize,
                     f_y2 as usize,
-                    floor_texture,
+                    sector.floor_flat_id,
                     floor_height,
                     light_level,
                     graphic,
