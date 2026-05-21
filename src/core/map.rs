@@ -1,4 +1,4 @@
-use crate::core::wad::Lump;
+use crate::core::wad::{Lump, Wad};
 use crate::core::wad::{read_i16, read_string};
 use anyhow::Result;
 
@@ -16,7 +16,9 @@ pub struct Map {
 }
 
 impl Map {
-    pub fn new_from_lumps(lumps: &[Lump]) -> Result<Self> {
+    pub fn new(wad: &Wad, name: &str) -> Result<Self> {
+        let start_index = wad.get_lump_index(name)?;
+        let lumps = &wad.lumps[start_index..];
         let mut map = Self {
             name: lumps[0].name.clone(),
             things: Thing::new_from_bytes(&lumps[1].bytes)?,

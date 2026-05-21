@@ -12,7 +12,7 @@ pub struct Doom {
 
 impl Doom {
     pub fn new(wad: Wad) -> Result<Self> {
-        let map = wad.read_map("E1M1")?;
+        let map = Map::new(&wad, "E1M1")?;
         let thing = &map.things[0];
         let player = Player::new(thing.x as f32, thing.y as f32, thing.angle as f32);
         Ok(Self { wad, map, player })

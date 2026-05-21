@@ -1,4 +1,3 @@
-use crate::core::map::Map;
 use anyhow::Result;
 use std::{
     fs::File,
@@ -45,12 +44,6 @@ impl Wad {
             .iter()
             .position(|lump| lump.name == name)
             .ok_or_else(|| anyhow::anyhow!("Lump named '{}' not found", name))
-    }
-
-    pub fn read_map(&self, name: &str) -> Result<Map> {
-        let start_index = self.get_lump_index(name)?;
-        let map_lumps = &self.lumps[start_index..];
-        Map::new_from_lumps(map_lumps)
     }
 }
 
