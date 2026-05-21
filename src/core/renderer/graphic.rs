@@ -18,7 +18,7 @@ pub struct Graphic {
 }
 
 impl Graphic {
-    pub fn new_from_wad(wad: &Wad) -> Result<Self> {
+    pub fn new(wad: &Wad) -> Result<Self> {
         // パレットを読み込む
         let lump = wad.get_lump("PLAYPAL")?;
         let palettes = get_palettes(&lump.bytes);

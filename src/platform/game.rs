@@ -30,7 +30,7 @@ impl Game {
     }
 
     fn new(doom: Doom) -> Result<Self> {
-        let graphic = Graphic::new_from_wad(&doom.wad)?;
+        let graphic = Graphic::new(&doom.wad)?;
         Ok(Self {
             doom,
             renderer: Renderer::new(graphic),
