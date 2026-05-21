@@ -9,8 +9,8 @@ pub mod pixel_buf;
 mod solidseg;
 pub mod view;
 
-const SCREEN_WIDTH: usize = 320;
-const SCREEN_HEIGHT: usize = 200;
+pub const SCREEN_WIDTH: usize = 320;
+pub const SCREEN_HEIGHT: usize = 200;
 
 pub struct Renderer {
     pixel_buf: PixelBuf,
