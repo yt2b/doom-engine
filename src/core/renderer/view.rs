@@ -5,6 +5,9 @@ use crate::core::player::Player;
 use crate::core::renderer::graphic::{FLAT_SIZE, Graphic, SKY_ID, Texture};
 use crate::core::renderer::pixel_buf::PixelBuf;
 use crate::core::renderer::solidseg::SolidSeg;
+use crate::core::renderer::view::plane::Plane;
+
+mod plane;
 
 pub struct ViewRenderer {
     width: f32,
@@ -17,15 +20,17 @@ pub struct ViewRenderer {
     lower_clip: Vec<f32>,
     fov_x_to_angle: Vec<f32>,
     wall_infos: Vec<WallInfo>,
+    plane: Plane,
 }
 
 impl ViewRenderer {
     pub fn new(width: f32, height: f32, fov: f32) -> Self {
         let half_width = width / 2.0;
         let screen_dist = half_width / (fov / 2.0).to_radians().tan();
-        let fov_x_to_angle = (0..(width as i16))
+        let fov_x_to_angle: Vec<f32> = (0..(width as i16))
             .map(|fov_x| convert_fov_x_to_angle(fov_x, half_width, screen_dist))
             .collect();
+        let plane = Plane::new(&fov_x_to_angle);
         Self {
             width,
             half_width,
@@ -37,6 +42,7 @@ impl ViewRenderer {
             lower_clip: vec![height; width as usize],
             fov_x_to_angle,
             wall_infos: Vec::new(),
+            plane,
         }
     }
 
@@ -803,7 +809,7 @@ struct WallInfo {
     lower_clip: Vec<f32>,
 }
 
-fn convert_fov_x_to_angle(fov_x: i16, half_width: f32, screen_dist: f32) -> f32 {
+pub fn convert_fov_x_to_angle(fov_x: i16, half_width: f32, screen_dist: f32) -> f32 {
     let x = half_width - fov_x as f32;
     (x / screen_dist).atan().to_degrees()
 }
