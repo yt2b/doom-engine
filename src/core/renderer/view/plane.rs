@@ -26,6 +26,7 @@ pub struct Plane {
 
 impl Plane {
     pub fn new(fov_x_to_angle: &[f32]) -> Self {
+        let visplanes = (0..MAX_VISPLANES).map(|_| Visplane::default()).collect();
         let mut new_fov_x_to_angle = [0.0; SCREEN_WIDTH];
         let mut dist_scales = [0.0; SCREEN_WIDTH];
         for x in 0..SCREEN_WIDTH {
@@ -39,7 +40,7 @@ impl Plane {
             caches.push(Cache::new(half_width / (half_height - y as f32).abs()));
         }
         Self {
-            visplanes: Vec::with_capacity(MAX_VISPLANES),
+            visplanes,
             active_indices: Vec::new(),
             free_indices: (0..MAX_VISPLANES).collect(),
             span_start: [0; SCREEN_HEIGHT],
@@ -50,7 +51,7 @@ impl Plane {
             player_angle: 0.0,
             half_width: SCREEN_WIDTH as f32 / 2.0,
             half_height: SCREEN_HEIGHT as f32 / 2.0,
-            sky_inverse_scale: 160.0 / (SCREEN_WIDTH as f32 / 2.0),
+            sky_inverse_scale: 160.0 / (SCREEN_HEIGHT as f32),
         }
     }
 
@@ -61,6 +62,9 @@ impl Plane {
         while let Some(idx) = self.active_indices.pop() {
             self.free_indices.push(idx);
         }
+        for cache in self.caches.iter_mut() {
+            cache.initialize();
+        }
     }
 
     pub fn set_player_state(&mut self, player_pos: Vector2, player_angle: f32) {
@@ -68,13 +72,13 @@ impl Plane {
         self.player_angle = player_angle;
     }
 
-    pub fn get_visplane(
+    pub fn get_visplane_idx(
         &mut self,
         height: f32,
         flat_id: usize,
         lightlevel: i16,
         fov_x: (i16, i16),
-    ) -> &mut Visplane {
+    ) -> usize {
         // 既存のvisplaneを検索
         for idx in self.active_indices.iter() {
             let visplane = &self.visplanes[*idx];
@@ -85,7 +89,7 @@ impl Plane {
             {
                 let visplane = &mut self.visplanes[*idx];
                 visplane.fov_x = (fov_x.0.min(visplane.fov_x.0), fov_x.1.max(visplane.fov_x.1));
-                return visplane;
+                return *idx;
             }
         }
         // 新しいvisplaneを割り当てる
@@ -96,7 +100,7 @@ impl Plane {
             visplane.light_level = lightlevel;
             visplane.fov_x = fov_x;
             self.active_indices.push(idx);
-            return visplane;
+            return idx;
         }
         panic!("No more free visplanes");
     }
@@ -112,35 +116,33 @@ impl Plane {
                 self.render_sky(graphic, pixel_buf, visplane);
             } else {
                 let flat_palettes = &graphic.flats[visplane.flat_id];
-                for x in (visplane.fov_x.0..=visplane.fov_x.1).map(|x| x as usize) {
+                for x in (visplane.fov_x.0..=(visplane.fov_x.1 + 1)).map(|x| x as usize) {
                     // 先頭に番兵があるので1加算する
-                    let (t1, t2) = (visplane.top[x], visplane.top[x + 1]);
-                    let (b1, b2) = (visplane.bottom[x], visplane.bottom[x + 1]);
-                    let mut dy_top = t2 - t1;
+                    let (mut t1, mut t2) = (visplane.top[x], visplane.top[x + 1]);
+                    let (mut b1, mut b2) = (visplane.bottom[x], visplane.bottom[x + 1]);
                     // 上端で終了したspanが発生
-                    while dy_top > 0 {
-                        let y = (dy_top + t2) as usize;
+                    while t1 < t2 && t1 <= b1 {
+                        let y = t1 as usize;
                         let x_range = (self.span_start[y], x - 1);
                         self.render_plane(graphic, pixel_buf, flat_palettes, visplane, x_range, y);
-                        dy_top -= 1;
-                    }
-                    // 上端で新しいspanが発生
-                    while dy_top < 0 {
-                        self.span_start[(dy_top + t2) as usize] = x;
-                        dy_top += 1;
-                    }
-                    let mut dy_bottom = b2 - b1;
-                    // 下端で新しいspanが発生
-                    while dy_bottom > 0 {
-                        self.span_start[(dy_bottom + b2) as usize] = x;
-                        dy_bottom -= 1;
+                        t1 += 1;
                     }
                     // 下端で終了したspanが発生
-                    while dy_bottom < 0 {
-                        let y = (dy_bottom + b2) as usize;
+                    while b1 > b2 && b1 >= t1 {
+                        let y = b1 as usize;
                         let x_range = (self.span_start[y], x - 1);
                         self.render_plane(graphic, pixel_buf, flat_palettes, visplane, x_range, y);
-                        dy_bottom += 1;
+                        b1 -= 1;
+                    }
+                    // 上端で新しいspanが発生
+                    while t1 > t2 && t2 <= b2 {
+                        self.span_start[t2 as usize] = x;
+                        t2 += 1;
+                    }
+                    // 下端で新しいspanが発生
+                    while b1 < b2 && b2 >= t2 {
+                        self.span_start[b2 as usize] = x;
+                        b2 -= 1;
                     }
                 }
             }
@@ -153,12 +155,17 @@ impl Plane {
         let palettes = &graphic.palettes[0];
         let x_range = (visplane.fov_x.0..=visplane.fov_x.1).map(|x| x as usize);
         for x in x_range {
+            let y1 = visplane.top[(x + 1) as usize];
+            if y1 == 0xff {
+                continue;
+            }
             let angle = 4.0 * (self.player_angle + self.fov_x_to_angle[x]);
             let normal = angle.rem_euclid(360.0) / 360.0;
             let texture_x = (normal * texture.width as f32) as usize;
-            let y1 = visplane.top[x as usize];
             let start_texture_y = 100.0 + (y1 as f32 - self.half_height) * self.sky_inverse_scale;
-            let y_range = (y1..=visplane.bottom[x]).map(|y| y as usize).enumerate();
+            let y_range = (y1..=visplane.bottom[x + 1])
+                .map(|y| y as usize)
+                .enumerate();
             for (i, y) in y_range {
                 let texture_y = (start_texture_y + i as f32 * self.sky_inverse_scale) as usize;
                 let idx = texture_y * texture.width + texture_x;
@@ -236,18 +243,26 @@ impl Visplane {
         self.light_level = 0;
         self.fov_x = (-1, SCREEN_WIDTH as i16);
         self.top.fill(0xff);
-        self.bottom.fill(0xff);
+        self.bottom.fill(0x00);
     }
 
     pub fn validte(&self, fov_x: (i16, i16)) -> bool {
         // 新しく追加された視野の範囲が全て書き込めるか調べる
         let inter_fov_x = (fov_x.0.max(self.fov_x.0), fov_x.1.min(self.fov_x.1));
-        for x in inter_fov_x.0..inter_fov_x.1 {
-            if self.top[x as usize] != 0xff {
+        for x in inter_fov_x.0..=inter_fov_x.1 {
+            if self.top[(x + 1) as usize] != 0xff {
                 return false;
             }
         }
         true
+    }
+
+    pub fn set_y_range(&mut self, x: usize, y1: isize, y2: isize) {
+        if y1 > y2 {
+            return;
+        }
+        self.top[x + 1] = y1;
+        self.bottom[x + 1] = y2;
     }
 }
 
@@ -281,5 +296,12 @@ impl Cache {
             dir_x: 0.0,
             dir_y: 0.0,
         }
+    }
+
+    pub fn initialize(&mut self) {
+        self.height = 0.0;
+        self.dist = 0.0;
+        self.dir_x = 0.0;
+        self.dir_y = 0.0;
     }
 }

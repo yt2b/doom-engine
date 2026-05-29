@@ -2,7 +2,7 @@ use crate::core::bsp::get_subsector_indices;
 use crate::core::map::{Map, Seg, SubSector};
 use crate::core::math::{Line, Vector2};
 use crate::core::player::Player;
-use crate::core::renderer::graphic::{FLAT_SIZE, Graphic, SKY_ID, Texture};
+use crate::core::renderer::graphic::{FLAT_SIZE, Graphic, Texture};
 use crate::core::renderer::pixel_buf::PixelBuf;
 use crate::core::renderer::solidseg::SolidSeg;
 use crate::core::renderer::view::plane::Plane;
@@ -61,12 +61,15 @@ impl ViewRenderer {
         self.upper_clip.fill(-1.0);
         self.lower_clip.fill(self.height);
         self.wall_infos.clear();
+        self.plane.initialize();
         for idx in get_subsector_indices(map, player) {
             self.render_subsector(pixel_buf, graphic, &map.subsectors[idx], map, player);
             if self.solid_seg.is_empty() {
                 break;
             }
         }
+        self.plane.set_player_state(player.pos, player.angle);
+        self.plane.render(graphic, pixel_buf);
         // wall_infosを逆順に描画する(遠い壁から近い壁の順)
         for wall_info in self.wall_infos.iter().rev() {
             self.render_wall_info(pixel_buf, graphic, map, player, wall_info);
@@ -188,7 +191,7 @@ impl ViewRenderer {
     }
 
     pub fn render_solid_wall(
-        &self,
+        &mut self,
         pixel_buf: &mut PixelBuf,
         graphic: &Graphic,
         map: &Map,
@@ -235,6 +238,17 @@ impl ViewRenderer {
         } else {
             ceiling_height
         } + sidedef.offset_y as f32;
+        let ceiling_visplane_idx = if is_render_ceiling {
+            let idx = self.plane.get_visplane_idx(
+                ceiling_height,
+                sector.ceiling_flat_id,
+                sector.light_level,
+                fov_x,
+            );
+            Some(idx)
+        } else {
+            None
+        };
 
         for x in fov_x.0..(fov_x.1 + 1) {
             let idx_x = x as usize;
@@ -245,17 +259,8 @@ impl ViewRenderer {
                 // 天井の上端はクリップの上端、下端は壁全体の上端とクリップの下端の小さい方
                 let c_y1 = self.upper_clip[idx_x] + 1.0;
                 let c_y2 = (y1 - 1.0).min(self.lower_clip[idx_x] - 1.0);
-                self.render_flat(
-                    pixel_buf,
-                    player,
-                    x,
-                    c_y1 as usize,
-                    c_y2 as usize,
-                    sector.ceiling_flat_id,
-                    ceiling_height,
-                    light_level,
-                    graphic,
-                );
+                let visplane = &mut self.plane.visplanes[ceiling_visplane_idx.unwrap()];
+                visplane.set_y_range(idx_x, c_y1 as isize, c_y2 as isize);
             }
             if is_render_wall {
                 // 壁の上端は壁全体の上端をクリップ、下端は壁全体の下端をクリップして描画する
@@ -420,6 +425,17 @@ impl ViewRenderer {
                 // portalはないので下端は壁全体の上端
                 (wall_y1, wall_y1_step)
             };
+        let ceiling_visplane_idx = if is_render_ceiling {
+            let idx = self.plane.get_visplane_idx(
+                front_ceiling_height,
+                front_sector.ceiling_flat_id,
+                front_sector.light_level,
+                fov_x,
+            );
+            Some(idx)
+        } else {
+            None
+        };
 
         for x in fov_x.0..(fov_x.1 + 1) {
             let idx_x = x as usize;
@@ -442,17 +458,8 @@ impl ViewRenderer {
                     // 天井の上端はクリップの上端、下端は壁全体の上端とクリップの下端の小さい方
                     let c_y1 = self.upper_clip[idx_x] + 1.0;
                     let c_y2 = (wall_y1 - 1.0).min(self.lower_clip[idx_x] - 1.0);
-                    self.render_flat(
-                        pixel_buf,
-                        player,
-                        x,
-                        c_y1 as usize,
-                        c_y2 as usize,
-                        ceiling_texture,
-                        front_ceiling_height,
-                        light_level,
-                        graphic,
-                    );
+                    let visplane = &mut self.plane.visplanes[ceiling_visplane_idx.unwrap()];
+                    visplane.set_y_range(idx_x, c_y1 as isize, c_y2 as isize);
                 }
                 // upper_wallの上端と下端をクリップして描画する
                 let w_y1 = upper_wall_y1.max(self.upper_clip[idx_x] + 1.0);
@@ -478,17 +485,8 @@ impl ViewRenderer {
                 let c_y1 = self.upper_clip[idx_x] + 1.0;
                 // 天井の下端は壁全体の上端とクリップの下端の小さい方
                 let c_y2 = (wall_y1 - 1.0).min(self.lower_clip[idx_x] - 1.0);
-                self.render_flat(
-                    pixel_buf,
-                    player,
-                    x,
-                    c_y1 as usize,
-                    c_y2 as usize,
-                    ceiling_texture,
-                    front_ceiling_height,
-                    light_level,
-                    graphic,
-                );
+                let visplane = &mut self.plane.visplanes[ceiling_visplane_idx.unwrap()];
+                visplane.set_y_range(idx_x, c_y1 as isize, c_y2 as isize);
                 if self.upper_clip[idx_x] < c_y2 {
                     self.upper_clip[idx_x] = c_y2
                 }
