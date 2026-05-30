@@ -707,6 +707,14 @@ fn calc_texture_x_offset(
     opposite - (seg_offset_dist + sidedef_offset_x) as f32
 }
 
+fn wrap_texture_coord(size: f32, texture_size: f32) -> f32 {
+    let mut wrapped_size = size;
+    while wrapped_size >= texture_size {
+        wrapped_size -= texture_size;
+    }
+    wrapped_size
+}
+
 #[cfg(test)]
 mod tests {
     use super::{calc_texture_x_offset, convert_fov_x_to_angle};
