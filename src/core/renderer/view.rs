@@ -665,8 +665,8 @@ impl ViewRenderer {
         let texture_height = texture.height as f32;
         let begin_texture_y = texture_y_offset + (y1 as f32 - self.half_height) * inverse_scale;
         for (idx, y) in (y1..=y2).enumerate() {
-            let texture_y = begin_texture_y + idx as f32 * inverse_scale;
-            let wrapped_texture_y = wrap_texture_coord(texture_y, texture_height);
+            let texture_y = (begin_texture_y + idx as f32 * inverse_scale) as isize;
+            let wrapped_texture_y = wrap_texture_coord(texture_y, texture_height as isize);
             let idx = wrapped_texture_y as usize * texture.width + texture_x;
             if let Some(palette_idx) = texture.palettes[idx] {
                 let mapped_idx = colormap[palette_idx];
@@ -708,12 +708,18 @@ fn calc_texture_x_offset(
     opposite - (seg_offset_dist + sidedef_offset_x) as f32
 }
 
-fn wrap_texture_coord(size: f32, texture_size: f32) -> f32 {
+fn wrap_texture_coord(size: isize, texture_size: isize) -> usize {
     let mut wrapped_size = size;
+    if wrapped_size < 0 {
+        while wrapped_size < 0 {
+            wrapped_size += texture_size;
+        }
+        return wrapped_size as usize;
+    }
     while wrapped_size >= texture_size {
         wrapped_size -= texture_size;
     }
-    wrapped_size
+    wrapped_size as usize
 }
 
 #[cfg(test)]

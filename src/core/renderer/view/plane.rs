@@ -169,9 +169,9 @@ impl Plane {
                 .map(|y| y as usize)
                 .enumerate();
             for (i, y) in y_range {
-                let texture_y = start_texture_y + i as f32 * self.sky_inverse_scale;
-                let wrapped_texture_y = wrap_texture_coord(texture_y, texture.height as f32);
-                let idx = wrapped_texture_y as usize * texture.width + texture_x;
+                let texture_y = (start_texture_y + i as f32 * self.sky_inverse_scale) as isize;
+                let wrapped_texture_y = wrap_texture_coord(texture_y, texture.height as isize);
+                let idx = wrapped_texture_y * texture.width + texture_x;
                 if let Some(pallete_idx) = texture.palettes[idx] {
                     let rgb = palettes[pallete_idx];
                     pixel_buf.set_pixel(x, y, rgb);
