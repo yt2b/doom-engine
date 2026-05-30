@@ -37,7 +37,7 @@ impl Plane {
         let (half_width, half_height) = (SCREEN_WIDTH as f32 / 2.0, SCREEN_HEIGHT as f32 / 2.0);
         let mut caches = Vec::new();
         for y in 0..SCREEN_HEIGHT {
-            caches.push(Cache::new(half_width / (half_height - y as f32).abs()));
+            caches.push(Cache::new(half_width / (half_height - y as f32)));
         }
         Self {
             visplanes,
