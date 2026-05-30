@@ -2,7 +2,7 @@ use crate::core::bsp::get_subsector_indices;
 use crate::core::map::{Map, Seg, SubSector};
 use crate::core::math::{Line, Vector2};
 use crate::core::player::Player;
-use crate::core::renderer::graphic::{FLAT_SIZE, Graphic, Texture};
+use crate::core::renderer::graphic::{Graphic, Texture};
 use crate::core::renderer::pixel_buf::PixelBuf;
 use crate::core::renderer::solidseg::SolidSeg;
 use crate::core::renderer::view::plane::Plane;
@@ -10,7 +10,6 @@ use crate::core::renderer::view::plane::Plane;
 mod plane;
 
 pub struct ViewRenderer {
-    width: f32,
     half_width: f32,
     height: f32,
     half_height: f32,
@@ -32,7 +31,6 @@ impl ViewRenderer {
             .collect();
         let plane = Plane::new(&fov_x_to_angle);
         Self {
-            width,
             half_width,
             height,
             half_height: height / 2.0,
