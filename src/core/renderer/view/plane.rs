@@ -30,7 +30,7 @@ impl Plane {
         let mut new_fov_x_to_angle = [0.0; SCREEN_WIDTH];
         let mut dist_scales = [0.0; SCREEN_WIDTH];
         for x in 0..SCREEN_WIDTH {
-            let angle = fov_x_to_angle[x as usize];
+            let angle = fov_x_to_angle[x];
             new_fov_x_to_angle[x] = angle;
             dist_scales[x] = 1.0 / angle.to_radians().cos();
         }
@@ -155,7 +155,7 @@ impl Plane {
         let palettes = &graphic.palettes[0];
         let x_range = (visplane.fov_x.0..=visplane.fov_x.1).map(|x| x as usize);
         for x in x_range {
-            let y1 = visplane.top[(x + 1) as usize];
+            let y1 = visplane.top[x + 1];
             if y1 == 0xff {
                 continue;
             }
@@ -171,7 +171,7 @@ impl Plane {
                 let idx = texture_y * texture.width + texture_x;
                 if let Some(pallete_idx) = texture.palettes[idx] {
                     let rgb = palettes[pallete_idx];
-                    pixel_buf.set_pixel(x as usize, y, rgb);
+                    pixel_buf.set_pixel(x, y, rgb);
                 }
             }
         }
@@ -190,7 +190,7 @@ impl Plane {
         let (dist, dir_x, dir_y) = if visplane.height != cache.height {
             let cache = &mut self.caches[y];
             cache.height = visplane.height;
-            let dist = visplane.height as f32 * cache.y_slope;
+            let dist = visplane.height * cache.y_slope;
             cache.dist = dist;
             // xを1進めた時のworld座標の変化量
             // 「プレイヤーの角度 - 90度」の方向へ移動する
