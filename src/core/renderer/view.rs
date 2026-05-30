@@ -249,6 +249,17 @@ impl ViewRenderer {
         } else {
             None
         };
+        let floor_visplane_idx = if is_render_floor {
+            let idx = self.plane.get_visplane_idx(
+                floor_height,
+                sector.floor_flat_id,
+                sector.light_level,
+                fov_x,
+            );
+            Some(idx)
+        } else {
+            None
+        };
 
         for x in fov_x.0..(fov_x.1 + 1) {
             let idx_x = x as usize;
@@ -289,17 +300,8 @@ impl ViewRenderer {
                 // 床の上端は壁全体の下端とクリップの上端の大きい方、下端はクリップの下端
                 let f_y1 = (y2 + 1.0).max(self.upper_clip[idx_x] + 1.0);
                 let f_y2 = self.lower_clip[idx_x] - 1.0;
-                self.render_flat(
-                    pixel_buf,
-                    player,
-                    x,
-                    f_y1 as usize,
-                    f_y2 as usize,
-                    sector.floor_flat_id,
-                    floor_height,
-                    light_level,
-                    graphic,
-                );
+                let visplane = &mut self.plane.visplanes[floor_visplane_idx.unwrap()];
+                visplane.set_y_range(idx_x, f_y1 as isize, f_y2 as isize);
             }
         }
     }
@@ -436,6 +438,17 @@ impl ViewRenderer {
         } else {
             None
         };
+        let floor_visplane_idx = if is_render_floor {
+            let idx = self.plane.get_visplane_idx(
+                front_floor_height,
+                front_sector.floor_flat_id,
+                front_sector.light_level,
+                fov_x,
+            );
+            Some(idx)
+        } else {
+            None
+        };
 
         for x in fov_x.0..(fov_x.1 + 1) {
             let idx_x = x as usize;
@@ -496,17 +509,8 @@ impl ViewRenderer {
                     // 床の上端は壁全体の下端とクリップの上端の大きい方、下端はクリップの下端
                     let f_y1 = (wall_y2 + 1.0).max(self.upper_clip[idx_x] + 1.0);
                     let f_y2 = self.lower_clip[idx_x] - 1.0;
-                    self.render_flat(
-                        pixel_buf,
-                        player,
-                        x,
-                        f_y1 as usize,
-                        f_y2 as usize,
-                        floor_texture,
-                        front_floor_height,
-                        light_level,
-                        graphic,
-                    );
+                    let visplane = &mut self.plane.visplanes[floor_visplane_idx.unwrap()];
+                    visplane.set_y_range(idx_x, f_y1 as isize, f_y2 as isize);
                 }
                 let portal_y2 = portal_y2 + portal_y2_step * diff;
                 // lower_wallの上端はportalの下端とクリップの上端の大きい方
@@ -534,17 +538,8 @@ impl ViewRenderer {
                 let f_y1 = (wall_y2 + 1.0).max(self.upper_clip[idx_x] + 1.0);
                 // 床の下端はクリップの下端
                 let f_y2 = self.lower_clip[idx_x] - 1.0;
-                self.render_flat(
-                    pixel_buf,
-                    player,
-                    x,
-                    f_y1 as usize,
-                    f_y2 as usize,
-                    floor_texture,
-                    front_floor_height,
-                    light_level,
-                    graphic,
-                );
+                let visplane = &mut self.plane.visplanes[floor_visplane_idx.unwrap()];
+                visplane.set_y_range(idx_x, f_y1 as isize, f_y2 as isize);
                 if self.lower_clip[idx_x] > wall_y2 + 1.0 {
                     self.lower_clip[idx_x] = f_y1
                 }
