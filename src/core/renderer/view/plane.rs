@@ -8,6 +8,7 @@ use crate::core::{
 };
 
 const MAX_VISPLANES: usize = 128;
+const FLAT_MASK: i16 = (FLAT_SIZE - 1) as i16;
 
 pub struct Plane {
     pub visplanes: Vec<Visplane>,
@@ -217,8 +218,8 @@ impl Plane {
             let world_x = begin_world_x + dir_x * i;
             let world_y = begin_world_y + dir_y * i;
             // ワールド座標をテクスチャ座標に変換
-            let texture_x = world_x.rem_euclid(FLAT_SIZE as f32) as usize;
-            let texture_y = world_y.rem_euclid(FLAT_SIZE as f32) as usize;
+            let texture_x = (world_x as i16 & FLAT_MASK) as usize;
+            let texture_y = (world_y as i16 & FLAT_MASK) as usize;
             let palette_idx = flat_palettes[texture_y * FLAT_SIZE + texture_x];
             let mapped_idx = colormap[palette_idx];
             pixel_buf.set_pixel(x_range.0 + i as usize, y, color_palettes[mapped_idx]);
