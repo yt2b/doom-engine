@@ -324,8 +324,6 @@ impl ViewRenderer {
         // テクスチャ
         let upper_wall_texture = &front_sidedef.upper_texture_id;
         let lower_wall_texture = &front_sidedef.lower_texture_id;
-        let ceiling_texture = front_sector.ceiling_flat_id;
-        let floor_texture = front_sector.floor_flat_id;
         // 高さ
         let front_ceiling_height = front_sector.ceiling_height as f32 - player.view_height;
         let front_floor_height = front_sector.floor_height as f32 - player.view_height;
@@ -676,114 +674,6 @@ impl ViewRenderer {
                 pixel_buf.set_pixel(x as usize, y, rgb);
             }
             texture_y += inverse_scale;
-        }
-    }
-
-    fn render_flat(
-        &self,
-        pixel_buf: &mut PixelBuf,
-        player: &Player,
-        x: i16,
-        y1: usize,
-        y2: usize,
-        flat_id: usize,
-        world_height: f32,
-        light_level: i16,
-        graphic: &Graphic,
-    ) {
-        if y1 > y2 {
-            return;
-        }
-        if flat_id == graphic.sky_flat_id {
-            self.render_sky_texture(
-                pixel_buf,
-                player.angle,
-                x,
-                y1,
-                y2,
-                &graphic.wall_textures[graphic.sky_wall_texture_id],
-                graphic,
-            );
-        } else {
-            self.render_flat_texture(
-                pixel_buf,
-                player,
-                x,
-                y1,
-                y2,
-                &graphic.flats[flat_id],
-                world_height,
-                light_level,
-                graphic,
-            );
-        }
-    }
-
-    fn render_sky_texture(
-        &self,
-        pixel_buf: &mut PixelBuf,
-        player_angle: f32,
-        x: i16,
-        y1: usize,
-        y2: usize,
-        texture: &Texture,
-        graphic: &Graphic,
-    ) {
-        let palettes = &graphic.palettes[0];
-        // 4つの空の画像を360度に対応させる
-        let normal =
-            (4.0 * (player_angle + self.fov_x_to_angle[x as usize])).rem_euclid(360.0) / 360.0;
-        let texture_x = (normal * texture.width as f32) as usize;
-        let inverse_scale = 160.0 / self.height;
-        let mut texture_y = 100.0 + (y1 as f32 - self.half_height) * inverse_scale;
-        for y in y1..y2 + 1 {
-            let tex_y = texture_y.rem_euclid(texture.height as f32) as usize;
-            let idx = tex_y * texture.width + texture_x;
-            if let Some(pallete_idx) = texture.palettes[idx] {
-                let rgb = palettes[pallete_idx];
-                pixel_buf.set_pixel(x as usize, y, rgb);
-            }
-            texture_y += inverse_scale
-        }
-    }
-
-    fn render_flat_texture(
-        &self,
-        pixel_buf: &mut PixelBuf,
-        player: &Player,
-        x: i16,
-        y1: usize,
-        y2: usize,
-        palettes: &[usize],
-        view_height: f32,
-        light_level: i16,
-        graphic: &Graphic,
-    ) {
-        let color_idx = ((255 - light_level) / 16) as usize;
-        let colormap = &graphic.colormaps[color_idx];
-        let color_palettes = &graphic.palettes[0];
-        let dir_x = player.angle.to_radians().cos();
-        let dir_y = player.angle.to_radians().sin();
-        for y in y1..y2 + 1 {
-            // プレイヤーが見ている距離
-            let dist = self.half_width * view_height / (self.half_height - y as f32);
-            // プレイヤーから見たワールドの点の座標
-            let world_x = dir_x * dist + player.pos.x;
-            let world_y = dir_y * dist + player.pos.y;
-            // 視界の左端と右端のワールドの点の座標
-            let left_x = -dir_y * dist + world_x;
-            let left_y = dir_x * dist + world_y;
-            let right_x = dir_y * dist + world_x;
-            let right_y = -dir_x * dist + world_y;
-            // 現在の点からテクスチャのどこを描画するかを決める
-            let dx = (right_x - left_x) / self.width;
-            let dy = (right_y - left_y) / self.width;
-            let texture_x = (left_x + dx * x as f32).rem_euclid(FLAT_SIZE as f32) as usize;
-            let texture_y = (left_y + dy * x as f32).rem_euclid(FLAT_SIZE as f32) as usize;
-            let palette_idx = palettes[texture_y * FLAT_SIZE + texture_x];
-            let mapped_idx = colormap[palette_idx];
-            let rgb = color_palettes[mapped_idx];
-            pixel_buf.set_pixel(x as usize, y, rgb);
         }
     }
 }
