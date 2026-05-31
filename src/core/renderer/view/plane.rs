@@ -283,7 +283,7 @@ impl Default for Visplane {
     }
 }
 
-pub struct Cache {
+struct Cache {
     height: f32,
     y_slope: f32,
     dist: f32,
