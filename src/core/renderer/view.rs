@@ -663,7 +663,8 @@ impl ViewRenderer {
         let palettes = &graphic.palettes[0];
         let texture_x = texture_column.rem_euclid(texture.width as i16) as usize;
         let texture_height = texture.height as f32;
-        let begin_texture_y = texture_y_offset + (y1 as f32 - self.half_height) * inverse_scale;
+        let begin_texture_y =
+            (texture_y_offset + (y1 as f32 - self.half_height) * inverse_scale).max(0.0);
         for (idx, y) in (y1..=y2).enumerate() {
             let texture_y = (begin_texture_y + idx as f32 * inverse_scale) as isize;
             let wrapped_texture_y = wrap_texture_coord(texture_y, texture_height as isize);
