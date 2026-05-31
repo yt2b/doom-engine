@@ -665,15 +665,17 @@ impl ViewRenderer {
         let texture_height = texture.height as f32;
         let begin_texture_y =
             (texture_y_offset + (y1 as f32 - self.half_height) * inverse_scale).max(0.0);
-        for (idx, y) in (y1..=y2).enumerate() {
-            let texture_y = (begin_texture_y + idx as f32 * inverse_scale) as isize;
+        let mut pixel_idx = (y1 * pixel_buf.width + x as usize) * 4 as usize;
+        for i in 0..=(y2 - y1) {
+            let texture_y = (begin_texture_y + i as f32 * inverse_scale) as isize;
             let wrapped_texture_y = wrap_texture_coord(texture_y, texture_height as isize);
             let idx = wrapped_texture_y as usize * texture.width + texture_x;
             if let Some(palette_idx) = texture.palettes[idx] {
                 let mapped_idx = colormap[palette_idx];
                 let rgb = palettes[mapped_idx];
-                pixel_buf.set_pixel(x as usize, y, rgb);
+                pixel_buf.set_pixel(pixel_idx, rgb);
             }
+            pixel_idx += pixel_buf.width_step;
         }
     }
 }

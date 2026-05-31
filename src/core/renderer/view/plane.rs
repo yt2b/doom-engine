@@ -165,17 +165,16 @@ impl Plane {
             let normal = angle.rem_euclid(360.0) / 360.0;
             let texture_x = (normal * texture.width as f32) as usize;
             let start_texture_y = 100.0 + (y1 as f32 - self.half_height) * self.sky_inverse_scale;
-            let y_range = (y1..=visplane.bottom[x + 1])
-                .map(|y| y as usize)
-                .enumerate();
-            for (i, y) in y_range {
+            let mut pixel_idx = (y1 as usize * pixel_buf.width + x) * 4;
+            for i in 0..=(visplane.bottom[x + 1] - y1) as usize {
                 let texture_y = (start_texture_y + i as f32 * self.sky_inverse_scale) as isize;
                 let wrapped_texture_y = wrap_texture_coord(texture_y, texture.height as isize);
                 let idx = wrapped_texture_y * texture.width + texture_x;
                 if let Some(pallete_idx) = texture.palettes[idx] {
                     let rgb = palettes[pallete_idx];
-                    pixel_buf.set_pixel(x, y, rgb);
+                    pixel_buf.set_pixel(pixel_idx, rgb);
                 }
+                pixel_idx += pixel_buf.width_step;
             }
         }
     }
@@ -215,6 +214,7 @@ impl Plane {
         let colormap = &graphic.colormaps[color_idx];
         let color_palettes = &graphic.palettes[0];
         let range = 0..(x_range.1 - x_range.0 + 1);
+        let mut pixel_idx = (y * pixel_buf.width + x_range.0) * 4;
         for i in range.map(|i| i as f32) {
             // 現在のワールド座標
             let world_x = begin_world_x + dir_x * i;
@@ -224,7 +224,8 @@ impl Plane {
             let texture_y = (world_y as i16 & FLAT_MASK) as usize;
             let palette_idx = flat_palettes[texture_y * FLAT_SIZE + texture_x];
             let mapped_idx = colormap[palette_idx];
-            pixel_buf.set_pixel(x_range.0 + i as usize, y, color_palettes[mapped_idx]);
+            pixel_buf.set_pixel(pixel_idx, color_palettes[mapped_idx]);
+            pixel_idx += 4;
         }
     }
 }

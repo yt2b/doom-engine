@@ -1,6 +1,7 @@
 pub struct PixelBuf {
     pub width: usize,
     pub height: usize,
+    pub width_step: usize,
     pub buf: Vec<u8>,
 }
 
@@ -9,6 +10,7 @@ impl PixelBuf {
         Self {
             width,
             height,
+            width_step: width * 4,
             buf: vec![0; width * height * 4],
         }
     }
@@ -20,10 +22,15 @@ impl PixelBuf {
         }
     }
 
-    pub fn set_pixel(&mut self, x: usize, y: usize, rgb: (u8, u8, u8)) {
-        let buf = &mut self.buf[y * self.width * 4 + x * 4..];
-        buf[0] = rgb.0; // r
-        buf[1] = rgb.1; // g
-        buf[2] = rgb.2; // b
+    pub fn set_pixel(&mut self, idx: usize, rgb: (u8, u8, u8)) {
+        if idx >= self.buf.len() {
+            return;
+        }
+        unsafe {
+            let ptr = self.buf.as_mut_ptr().add(idx);
+            ptr.write(rgb.0); // r
+            ptr.add(1).write(rgb.1); // g
+            ptr.add(2).write(rgb.2); // b
+        }
     }
 }
