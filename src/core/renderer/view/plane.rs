@@ -198,7 +198,7 @@ impl Plane {
             // 「プレイヤーの角度 - 90度」の方向へ移動する
             let angle = self.player_angle - 90.0;
             cache.dir_x = dist * angle.to_radians().cos() / self.half_width;
-            cache.dir_y = dist * angle.to_radians().sin() / self.half_width;
+            cache.dir_y = -dist * angle.to_radians().sin() / self.half_width;
             (dist, cache.dir_x, cache.dir_y)
         } else {
             (cache.dist, cache.dir_x, cache.dir_y)
@@ -209,7 +209,7 @@ impl Plane {
         let angle = self.player_angle + self.fov_x_to_angle[x_range.0];
         // プレイヤー座標からangleへlength分進んだ座標
         let begin_world_x = self.player_pos.x + length * angle.to_radians().cos();
-        let begin_world_y = self.player_pos.y + length * angle.to_radians().sin();
+        let begin_world_y = -self.player_pos.y - length * angle.to_radians().sin();
         let color_idx = ((255 - visplane.light_level) / 16) as usize;
         let colormap = &graphic.colormaps[color_idx];
         let color_palettes = &graphic.palettes[0];
