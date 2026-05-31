@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::core::renderer::graphic::Graphic;
-use crate::core::wad::{Lump, Wad};
+use crate::core::wad::Wad;
 use crate::core::wad::{read_i16, read_string};
 use anyhow::Result;
 
