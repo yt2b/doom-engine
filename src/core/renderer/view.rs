@@ -221,6 +221,9 @@ impl ViewRenderer {
         let hypotenuse = line.start.dist(&player.pos);
         // 壁の法線距離 ※「cos(offset_angle) = normal_dist / hypotenuse」の変形
         let normal_dist = hypotenuse * offset_angle.to_radians().cos();
+        if normal_dist <= 0.0 {
+            return;
+        }
         let (scale1, scale_step) =
             self.calc_line_scale(normal_angle, normal_dist, player.angle, fov_x);
         let wall_y1 = (self.height / 2.0) - ceiling_height * scale1;
@@ -367,6 +370,9 @@ impl ViewRenderer {
         let hypotenuse = line.start.dist(&player.pos);
         // 壁の法線距離 ※「cos(offset_angle) = normal_dist / hypotenuse」の変形
         let normal_dist = hypotenuse * offset_angle.to_radians().cos();
+        if normal_dist <= 0.0 {
+            return;
+        }
         let (scale1, scale_step) =
             self.calc_line_scale(normal_angle, normal_dist, player.angle, fov_x);
         // 壁全体の上端と下端のy座標と、y座標の変化量
