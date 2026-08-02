@@ -1,5 +1,7 @@
 # doom-engine
 
+<img src="main.png" width="80%">
+
 ## 参考文献
 
 https://doomwiki.org/wiki/Entryway  
